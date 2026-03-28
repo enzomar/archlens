@@ -17,7 +17,13 @@ export const ViewManager: React.FC = () => {
 
   return (
     <div className="view-manager">
-      <button className="btn btn-sm" onClick={() => setOpen(!open)}>
+      <button
+        className="btn btn-sm"
+        onClick={() => setOpen(!open)}
+        title={open ? 'Hide saved views' : 'Show saved views'}
+        aria-label="Saved views"
+        aria-expanded={open}
+      >
         <LayoutGrid size={14} /> Views {views.length > 0 && `(${views.length})`}
       </button>
 
@@ -37,7 +43,7 @@ export const ViewManager: React.FC = () => {
                     {v.name}
                     <span className="view-item-meta">{v.zoomLevel}</span>
                   </button>
-                  <button className="btn-icon btn-danger-icon" onClick={() => deleteView(v.id)} aria-label="Delete view"><X size={14} /></button>
+                  <button className="btn-icon btn-danger-icon" onClick={() => deleteView(v.id)} aria-label={`Delete view: ${v.name}`} title={`Delete view: ${v.name}`}><X size={14} /></button>
                 </li>
               ))}
             </ul>

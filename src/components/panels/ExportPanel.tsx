@@ -55,7 +55,7 @@ export const ExportPanel: React.FC = () => {
       >
         <div className="modal-header">
           <h2 id="export-panel-title">Export</h2>
-          <button className="btn-icon" onClick={() => setShow(false)} aria-label="Close"><X size={18} /></button>
+          <button className="btn-icon" onClick={() => setShow(false)} aria-label="Close export panel" title="Close"><X size={18} /></button>
         </div>
 
         <div className="export-options">

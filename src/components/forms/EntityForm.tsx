@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../../store/useStore';
 import type {
-  EntityKind, Maturity, TShirtSize, AppType, DeploymentStage, TechConvergency, EntityMetadata, EdgeType,
+  EntityKind, Maturity, TShirtSize, AppType, DeploymentStage, TechConvergency, EntityMetadata, EdgeType, Viewpoint, ZoomLevel,
 } from '../../domain/types';
 import {
   ALL_ENTITY_KINDS, ALL_MATURITIES, ALL_TSHIRT_SIZES, ALL_APP_TYPES,
-  ALL_DEPLOYMENT_STAGES, ALL_EDGE_TYPES, FIELD_HELP,
+  ALL_DEPLOYMENT_STAGES, ALL_EDGE_TYPES, FIELD_HELP, CONCRETE_VIEWPOINTS, ALL_ZOOM_LEVELS,
 } from '../../domain/types';
 import { getValidKindsForViewpoint } from '../../utils/validation';
 import { X, HelpCircle, Plus, Trash2, Copy } from 'lucide-react';
@@ -68,7 +68,7 @@ export const EntityForm: React.FC = () => {
   const zoomLevel = useStore((s) => s.zoomLevel);
   const storeViewpoint = useStore((s) => s.viewpoint);
 
-  // Derive allowed kinds from current viewpoint + zoom level.
+  // Derive allowed kinds from form-level viewpoint + zoom (reactive to user's form selection).
   const contextKinds = getValidKindsForViewpoint(storeViewpoint, zoomLevel);
   const allowedKinds: EntityKind[] = contextKinds.length > 0 ? contextKinds : ALL_ENTITY_KINDS;
 
@@ -84,6 +84,8 @@ export const EntityForm: React.FC = () => {
   const [parentId, setParentId] = useState<string>('');
   const [responsibilities, setResponsibilities] = useState<string[]>([]);
   const [newResponsibility, setNewResponsibility] = useState('');
+  const [formViewpoint, setFormViewpoint] = useState<Viewpoint>(storeViewpoint);
+  const [formZoomLevel, setFormZoomLevel] = useState<ZoomLevel>(zoomLevel);
 
   // Metadata fields
   const [maturity, setMaturity] = useState<Maturity | ''>('');
@@ -161,6 +163,8 @@ export const EntityForm: React.FC = () => {
       setKind(editing.kind);
       setParentId(editing.parentId ?? '');
       setResponsibilities([...editing.responsibilities]);
+      setFormViewpoint(editing.viewpoint);
+      setFormZoomLevel(editing.zoomLevel ?? zoomLevel);
       setMaturity(editing.metadata.maturity ?? '');
       setSize(editing.metadata.size ?? '');
       setAppType(editing.metadata.appType ?? '');
@@ -200,6 +204,7 @@ export const EntityForm: React.FC = () => {
     setTechConvergency(0); setTechnology(''); setOwner(''); setNotes('');
     setTps(''); setCompute(''); setCodeRepository('');
     setPii(false); setPciDss(false); setErrors([]);
+    setFormViewpoint(storeViewpoint); setFormZoomLevel(zoomLevel);
     setRelDrafts([]); setDeletedRelIds([]);
     setShowAddRel(false); resetNewRel();
   }
@@ -239,7 +244,8 @@ export const EntityForm: React.FC = () => {
       shortName,
       description,
       kind,
-      viewpoint: storeViewpoint,
+      viewpoint: formViewpoint,
+      zoomLevel: formZoomLevel,
       parentId: parentId || null,
       metadata,
       responsibilities,
@@ -419,6 +425,26 @@ export const EntityForm: React.FC = () => {
             <div className="form-group">
               <FieldLabel htmlFor="entity-shortname" required helpKey="shortName">Short Name</FieldLabel>
               <input id="entity-shortname" type="text" value={shortName} onChange={(e) => setShortName(e.target.value)} placeholder="e.g. OrdSvc" maxLength={12} />
+            </div>
+          </div>
+
+          {/* ── Viewpoint + C4 Zoom Level ────────────────── */}
+          <div className="form-row">
+            <div className="form-group">
+              <FieldLabel htmlFor="entity-viewpoint" helpKey="viewpoint">Viewpoint</FieldLabel>
+              <select id="entity-viewpoint" value={formViewpoint} onChange={(e) => setFormViewpoint(e.target.value as Viewpoint)}>
+                {CONCRETE_VIEWPOINTS.map((vp) => (
+                  <option key={vp} value={vp}>{vp.charAt(0).toUpperCase() + vp.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <FieldLabel htmlFor="entity-zoom" helpKey="zoomLevel">C4 Zoom Level</FieldLabel>
+              <select id="entity-zoom" value={formZoomLevel} onChange={(e) => setFormZoomLevel(e.target.value as ZoomLevel)}>
+                {ALL_ZOOM_LEVELS.map((z) => (
+                  <option key={z} value={z}>{z.charAt(0).toUpperCase() + z.slice(1)}</option>
+                ))}
+              </select>
             </div>
           </div>
 

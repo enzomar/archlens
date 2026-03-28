@@ -1,45 +1,102 @@
 import type { ArchEntity, Relationship, NodePosition, NodeDisplayMode, Viewpoint, ZoomLevel } from '../domain/types';
-import { NODE_DIMENSIONS, NODE_DIMENSIONS_EXTENDED, KIND_TO_ZOOM, CONCRETE_VIEWPOINTS } from '../domain/types';
+import { NODE_DIMENSIONS, NODE_DIMENSIONS_EXTENDED, KIND_TO_ZOOM } from '../domain/types';
 
+// ─── LAYOUT DIRECTION ─────────────────────────────────────────────
+
+export type LayoutDirection = 'TD' | 'LR';
+
+/**
+ * C4 / ArchiMate / Mermaid-inspired direction resolution:
+ *  - Technical viewpoint      → LR  (infrastructure reads left → right: LB → App → DB)
+ *  - Component / Code zoom    → LR  (module internals, like Mermaid `graph LR`)
+ *  - Context / Container      → TD  (actors at top, systems below — classic C4)
+ */
+function resolveDirection(viewpoint?: Viewpoint, zoomLevel?: ZoomLevel): LayoutDirection {
+  if (viewpoint === 'technical') return 'LR';
+  if (zoomLevel === 'component' || zoomLevel === 'code') return 'LR';
+  return 'TD';
+}
+
+/**
+ * Zoom-adaptive spacing constants:
+ *  - Context:   generous (few high-level actors / systems — need breathing room)
+ *  - Container: standard C4 spacing
+ *  - Component: tight (many fine-grained nodes, like a class diagram)
+ *  - Code:      densest
+ */
+function resolveSpacing(zoomLevel?: ZoomLevel): {
+  mainGap: number;   // gap between layers (Y in TD, X in LR)
+  crossGap: number;  // gap between nodes within a layer (X in TD, Y in LR)
+  padding: number;   // canvas-edge padding
+  groupGap: number;  // extra gap between parent-group clusters
+} {
+  switch (zoomLevel) {
+    case 'context':   return { mainGap: 140, crossGap: 100, padding: 100, groupGap: 60 };
+    case 'container': return { mainGap: 100, crossGap: 70,  padding: 80,  groupGap: 40 };
+    case 'component': return { mainGap: 80,  crossGap: 50,  padding: 60,  groupGap: 30 };
+    case 'code':      return { mainGap: 60,  crossGap: 40,  padding: 50,  groupGap: 24 };
+    default:          return { mainGap: 100, crossGap: 70,  padding: 80,  groupGap: 40 };
+  }
+}
+
+// Padding used by the global (multi-viewpoint) layout
 const PADDING = 80;
-const LAYER_GAP_Y = 100; // vertical gap between layers
-const NODE_GAP_X  = 70;  // horizontal gap between nodes in the same layer
 
 export interface LayoutResult {
   positions: NodePosition[];
 }
 
-// Preferred left-to-right visual order for same-kind grouping within a layer
+// Kind priority within a layer (lower number = placed first / leftmost / topmost)
 const KIND_ORDER: Record<string, number> = {
-  person:    0,
-  trigger:   1,
-  system:    2,
-  container: 3,
-  component: 4,
-  artifact:  5,
+  person:      0,
+  trigger:     1,
+  system:      2,
+  container:   3,
+  aimodel:     4,
+  vectorstore: 5,
+  component:   6,
+  retriever:   7,
+  evaluation:  8,
+  artifact:    9,
 };
 
+/** External actor / initiator kinds — semantically pinned to layer 0 in Context and Container views */
+const ACTOR_KINDS = new Set(['person', 'trigger']);
+
 /**
- * Hierarchical (Sugiyama-inspired) layout:
+ * Sugiyama-inspired hierarchical layout with C4 / ArchiMate / Mermaid adaptations.
  *
- *  1. Build a directed graph from relationships.
- *  2. Detect and break cycles (DFS back-edge removal) to produce a DAG.
- *  3. Assign each node a layer using "longest path from source" (Kahn's BFS):
- *       - Pure sources (no incoming edges) → layer 0 (top)
- *       - Pure sinks (no outgoing edges)   → last layer (bottom)
- *  4. Minimize edge crossings using the barycenter heuristic (3 sweeps).
- *     Within a layer, nodes with the same kind are kept adjacent as a
- *     secondary sort criterion.
- *  5. Center every layer horizontally relative to the widest layer.
- *  6. Respect locked positions (locked nodes are never moved).
+ * Direction (TD vs LR):
+ *   Technical viewpoint or Component/Code zoom  →  Left-to-Right (Mermaid-style `graph LR`)
+ *   All other viewpoint/zoom combinations       →  Top-Down (classic C4 context / container)
+ *
+ * Spacing scales with zoom level:
+ *   Context: generous  |  Container: standard  |  Component: tight  |  Code: densest
+ *
+ * Semantic layer pinning:
+ *   Context / Container zoom: person + trigger are forced to layer 0
+ *   (external actors always at the periphery, matching C4 context diagram convention)
+ *
+ * Algorithm:
+ *   1. Build directed graph from visible relationships
+ *   2. Break cycles (DFS back-edge removal) → DAG
+ *   3. Assign layers (Kahn's BFS longest-path)
+ *   4. Semantic layer pinning (zoom-aware actor placement)
+ *   5. Minimise edge crossings (barycenter heuristic, 3 sweeps)
+ *   6. Assign pixel coordinates (TD or LR, centred, parent-groups clustered)
+ *   7. Preserve locked node positions
  */
 export function computeLayout(
   entities: ArchEntity[],
   existingPositions: NodePosition[],
   displayMode: NodeDisplayMode = 'standard',
   relationships: Relationship[] = [],
+  viewpoint?: Viewpoint,
+  zoomLevel?: ZoomLevel,
 ): LayoutResult {
   const DIMS = displayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
+  const direction = resolveDirection(viewpoint, zoomLevel);
+  const { mainGap, crossGap, padding, groupGap } = resolveSpacing(zoomLevel);
 
   // ── Separate locked vs unlocked ──────────────────────────────
 
@@ -150,7 +207,28 @@ export function computeLayout(
   // Fallback: nodes not reached (cycle remnants)
   for (const e of unlocked) if (!layer.has(e.id)) layer.set(e.id, 0);
 
-  // ── Step 3: Build layers array ───────────────────────────────
+  // ── Step 3: Semantic layer pinning ───────────────────────────
+  //
+  // C4 Context / Container: person + trigger are external actors.
+  // Force them to layer 0 so they appear at the top (TD) or left (LR),
+  // creating the classic C4 "actors at periphery" pattern.
+  // Non-actors that ended at layer 0 (isolated systems / containers) are
+  // bumped to layer 1 so they appear below / after the actor row.
+  if (zoomLevel === 'context' || zoomLevel === 'container') {
+    const hasActors = unlocked.some((e) => ACTOR_KINDS.has(e.kind));
+    if (hasActors) {
+      for (const e of unlocked) {
+        if (ACTOR_KINDS.has(e.kind)) layer.set(e.id, 0);
+      }
+      for (const e of unlocked) {
+        if (!ACTOR_KINDS.has(e.kind) && layer.get(e.id) === 0) {
+          layer.set(e.id, 1);
+        }
+      }
+    }
+  }
+
+  // ── Step 4: Build layers array ───────────────────────────────
 
   const maxLayer = Math.max(...layer.values());
   const layers: string[][] = Array.from({ length: maxLayer + 1 }, () => []);
@@ -210,75 +288,77 @@ export function computeLayout(
 
   barycenterSweep('down');
   barycenterSweep('up');
-  barycenterSweep('down'); // third pass usually removes another 10-15 % of crossings
+  barycenterSweep('down'); // third pass removes another 10-15 % of crossings
 
-  // ── Step 5: Compute pixel coordinates ────────────────────────
+  // ── Step 6: Pixel coordinate assignment ─────────────────────
   //
-  // When entities share a parentId, cluster them into groups so the
-  // parent-frame rendering wraps them neatly.  Groups are laid out
-  // left-to-right within each layer, with extra spacing between groups.
+  // Parent groups (nodes sharing a parentId) are clustered with an extra
+  // `groupGap` between clusters to visually delineate container families.
+  //
+  // TD mode: layers are horizontal rows — nodes spread left → right.
+  // LR mode: layers are vertical columns — nodes stack top → bottom.
 
-  const GROUP_GAP = 40; // extra horizontal gap between parent groups
-
-  // Build a list of "group runs" for each layer.  A group run is a
-  // consecutive sequence of entity ids that share the same parentId.
-  // Orphans (no parentId) each get their own run.
+  // Group-runs: consecutive siblings sharing the same parentId.
   function groupedRow(row: string[]): string[][] {
-    // Separate entities into parent-groups + orphans, preserving order
     const groups = new Map<string, string[]>();
-    const orphans: string[] = [];
     for (const id of row) {
-      const e = entityById.get(id);
-      const pid = e?.parentId;
+      const pid = entityById.get(id)?.parentId;
       if (pid) {
         const arr = groups.get(pid);
         if (arr) arr.push(id);
         else groups.set(pid, [id]);
-      } else {
-        orphans.push(id);
       }
     }
-    // Emit groups in the order of their first appearance in the row
     const seen = new Set<string | null>();
     const runs: string[][] = [];
     for (const id of row) {
       const pid = entityById.get(id)?.parentId ?? null;
       if (seen.has(pid)) continue;
       seen.add(pid);
-      if (pid && groups.has(pid)) {
-        runs.push(groups.get(pid)!);
-      } else if (!pid) {
-        runs.push([id]);
-      }
+      if (pid && groups.has(pid)) runs.push(groups.get(pid)!);
+      else if (!pid) runs.push([id]);
     }
     return runs;
   }
 
-  function layerPixelWidth(row: string[]): number {
+  // Total span of a layer in the CROSS dimension:
+  //   TD mode → X span (sum of node widths + gaps)
+  //   LR mode → Y span (sum of node heights + gaps)
+  function layerCrossSpan(row: string[]): number {
     const runs = groupedRow(row);
-    let w = 0;
+    let span = 0;
     for (let r = 0; r < runs.length; r++) {
       const run = runs[r];
       for (let i = 0; i < run.length; i++) {
-        w += DIMS[entityById.get(run[i])?.kind ?? 'system'].width;
-        if (i < run.length - 1) w += NODE_GAP_X;
+        const d = DIMS[entityById.get(run[i])?.kind ?? 'system'];
+        span += direction === 'LR' ? d.height : d.width;
+        if (i < run.length - 1) span += crossGap;
       }
-      if (r < runs.length - 1) w += NODE_GAP_X + GROUP_GAP;
+      if (r < runs.length - 1) span += crossGap + groupGap;
     }
-    return w;
+    return span;
   }
 
-  const maxWidth = Math.max(...layers.map(layerPixelWidth));
-  const canvasCenterX = PADDING + maxWidth / 2;
+  const maxCrossSpan = Math.max(...layers.map(layerCrossSpan), 60);
+  const canvasCrossCenter = padding + maxCrossSpan / 2;
 
   const positions: NodePosition[] = [...locked.values()];
-  let currentY = PADDING;
+  let mainOffset = padding;
 
   for (const row of layers) {
     const runs = groupedRow(row);
-    const rowW = layerPixelWidth(row);
-    let x = canvasCenterX - rowW / 2;
-    let rowH = 0;
+    const crossSpan = layerCrossSpan(row);
+
+    // Max dimension in the MAIN direction (drives the step between layers):
+    //   TD → max node height  |  LR → max node width
+    let layerMainSize = 0;
+    for (const id of row) {
+      const d = DIMS[entityById.get(id)?.kind ?? 'system'];
+      layerMainSize = Math.max(layerMainSize, direction === 'LR' ? d.width : d.height);
+    }
+
+    // Start position in the cross dimension, centred relative to the widest layer
+    let cross = canvasCrossCenter - crossSpan / 2;
 
     for (let r = 0; r < runs.length; r++) {
       const run = runs[r];
@@ -286,15 +366,19 @@ export function computeLayout(
         const id = run[i];
         if (locked.has(id)) continue;
         const entity = entityById.get(id)!;
-        const dims = DIMS[entity.kind];
-        positions.push({ entityId: id, x, y: currentY, locked: false });
-        x += dims.width + NODE_GAP_X;
-        rowH = Math.max(rowH, dims.height);
+        const d = DIMS[entity.kind];
+        positions.push({
+          entityId: id,
+          x: direction === 'LR' ? mainOffset : cross,
+          y: direction === 'LR' ? cross       : mainOffset,
+          locked: false,
+        });
+        cross += (direction === 'LR' ? d.height : d.width) + crossGap;
       }
-      if (r < runs.length - 1) x += GROUP_GAP;
+      if (r < runs.length - 1) cross += groupGap;
     }
 
-    currentY += rowH + LAYER_GAP_Y;
+    mainOffset += layerMainSize + mainGap;
   }
 
   return { positions };
@@ -331,7 +415,8 @@ export function centerOnEntity(
 // Within each cell, entities are laid out left-to-right grouped by parent.
 
 const GLOBAL_VP_ORDER: Viewpoint[] = ['business', 'application', 'technical'];
-const GLOBAL_LEVEL_ORDER: ZoomLevel[] = ['context', 'container', 'component'];
+// Four C4 zoom levels — a 'code' column appears when code-level entities exist
+const GLOBAL_LEVEL_ORDER: ZoomLevel[] = ['context', 'container', 'component', 'code'];
 
 export interface GlobalLayoutResult {
   positions: NodePosition[];
@@ -373,7 +458,10 @@ export function computeGlobalLayout(
   }
 
   for (const e of entities) {
-    const lv = KIND_TO_ZOOM[e.kind];
+    // Prefer the entity's explicitly-set zoomLevel; fall back to kind inference
+    const lv: ZoomLevel = (e.zoomLevel && GLOBAL_LEVEL_ORDER.includes(e.zoomLevel))
+      ? e.zoomLevel
+      : KIND_TO_ZOOM[e.kind];
     if (!GLOBAL_LEVEL_ORDER.includes(lv)) continue;
     const vp = e.viewpoint;
     if (!GLOBAL_VP_ORDER.includes(vp as Viewpoint)) continue;

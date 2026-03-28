@@ -6,10 +6,12 @@ import { NoteNode } from './NoteNode';
 import { BoundaryBox } from './BoundaryBox';
 import { computeLayout, computeGlobalLayout } from '../../layout/layoutEngine';
 import type { GlobalLayoutResult } from '../../layout/layoutEngine';
-import { KIND_COLORS, EDGE_VISUALS, NODE_DIMENSIONS, NODE_DIMENSIONS_EXTENDED, VIEWPOINT_LABELS, VIEWPOINT_COLORS, getViewpointsForKindLevel, KIND_TO_ZOOM, CONCRETE_VIEWPOINTS } from '../../domain/types';
+import { KIND_COLORS, NODE_DIMENSIONS, NODE_DIMENSIONS_EXTENDED, VIEWPOINT_LABELS, VIEWPOINT_COLORS } from '../../domain/types';
 import type { EntityKind, EdgeType, ZoomLevel, Viewpoint } from '../../domain/types';
 import { getValidKindsForViewpoint } from '../../utils/validation';
-import { Edit, Trash2, Plus, Eye, LayoutGrid, RotateCcw, StickyNote, Square, Navigation } from 'lucide-react';
+import { CanvasContextMenu } from './CanvasContextMenu';
+import type { ContextMenuTarget } from './CanvasContextMenu';
+import { CanvasLegend } from './CanvasLegend';
 
 const ZOOM_TITLES: Record<string, string> = {
   context: 'System Context',
@@ -24,40 +26,6 @@ const HANDLE_CURSOR: Record<ResizeHandleType, string> = {
   nw: 'nw-resize', n: 'n-resize', ne: 'ne-resize', e: 'e-resize',
   se: 'se-resize', s: 's-resize', sw: 'sw-resize', w: 'w-resize',
 };
-
-const KIND_LABELS: Record<EntityKind, string> = {
-  person: 'Person',
-  system: 'Software System',
-  container: 'Container',
-  component: 'Component',
-  artifact: 'Artifact',
-  trigger: 'Trigger',
-  aimodel: 'AI Model',
-  vectorstore: 'Vector Store',
-  retriever: 'Retriever',
-  evaluation: 'Evaluation',
-};
-
-const EDGE_LABELS: Record<EdgeType, string> = {
-  sync: 'Synchronous',
-  async: 'Asynchronous',
-  dataflow: 'Data Flow',
-  dependency: 'Dependency',
-  trigger: 'Trigger',
-  retrieves: 'Retrieves',
-  augments: 'Augments',
-  generates: 'Generates',
-  retrieves_from: 'Retrieves From',
-  queries_model: 'Queries Model',
-  evaluates: 'Evaluates',
-};
-
-type ContextMenuTarget =
-  | { kind: 'entity'; id: string }
-  | { kind: 'note'; id: string }
-  | { kind: 'boundary'; id: string }
-  | { kind: 'relationship'; id: string }
-  | { kind: 'canvas'; worldX: number; worldY: number };
 
 export const DiagramCanvas: React.FC = () => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -194,7 +162,7 @@ export const DiagramCanvas: React.FC = () => {
         }
       }
       const layoutEntities = visibleEntities.filter((e) => !childParentIds.has(e.id));
-      const result = computeLayout(layoutEntities, positions, visualConfig.nodeDisplayMode);
+      const result = computeLayout(layoutEntities, positions, visualConfig.nodeDisplayMode, visibleRelationships, viewpoint, zoomLevel);
       for (const pos of result.positions) {
         if (!posMap.has(pos.entityId)) {
           setPosition(pos.entityId, pos.x, pos.y);
@@ -1256,115 +1224,7 @@ export const DiagramCanvas: React.FC = () => {
       </text>
 
       {/* C4 Diagram Key/Legend (fixed bottom-right) */}
-      {(visibleKinds.length > 0 || visibleEdgeTypes.length > 0) && (
-        <g className="diagram-key">
-          <foreignObject
-            x="100%"
-            y="100%"
-            width={220}
-            height={400}
-            style={{ overflow: 'visible' }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                right: 16,
-                bottom: 48,
-                background: 'var(--surface, #fff)',
-                border: '1px solid var(--border, #DFE6E9)',
-                borderRadius: 8,
-                padding: '10px 12px',
-                fontSize: 10,
-                lineHeight: '1.6',
-                color: 'var(--text, #2D3436)',
-                minWidth: 170,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-              }}
-            >
-              <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 6 }}>Key</div>
-              {isGlobalView && (
-                <div style={{ marginBottom: 6 }}>
-                  <div style={{ fontWeight: 600, fontSize: 10, marginBottom: 3, color: 'var(--text-secondary, #636E72)' }}>Viewpoints</div>
-                  {CONCRETE_VIEWPOINTS.map((vp) => (
-                    <div key={vp} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                      <span style={{
-                        display: 'inline-block', width: 10, height: 10, borderRadius: 2,
-                        background: VIEWPOINT_COLORS[vp], opacity: 0.7,
-                      }} />
-                      <span>{VIEWPOINT_LABELS[vp]}</span>
-                    </div>
-                  ))}
-                  <div style={{ borderTop: '1px solid var(--border, #DFE6E9)', marginTop: 4, paddingTop: 4 }} />
-                </div>
-              )}
-              {visibleKinds.map((kind) => (
-                <div key={kind} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <svg width={22} height={16} style={{ flexShrink: 0 }}>
-                    {kind === 'person' ? (
-                      <>
-                        <circle cx={11} cy={3} r={3} fill={KIND_COLORS[kind]} opacity={0.5} stroke={KIND_COLORS[kind]} strokeWidth={0.8} />
-                        <rect x={2} y={7} width={18} height={9} rx={2} fill={KIND_COLORS[kind]} opacity={0.3} stroke={KIND_COLORS[kind]} strokeWidth={0.8} />
-                      </>
-                    ) : kind === 'component' ? (
-                      <>
-                        <rect x={3} y={1} width={17} height={14} rx={1} fill={KIND_COLORS[kind]} opacity={0.2} stroke={KIND_COLORS[kind]} strokeWidth={0.8} />
-                        <rect x={0} y={4} width={6} height={3} rx={0.5} fill={KIND_COLORS[kind]} opacity={0.4} stroke={KIND_COLORS[kind]} strokeWidth={0.5} />
-                        <rect x={0} y={9} width={6} height={3} rx={0.5} fill={KIND_COLORS[kind]} opacity={0.4} stroke={KIND_COLORS[kind]} strokeWidth={0.5} />
-                      </>
-                    ) : kind === 'artifact' ? (
-                      <path d="M0,0 L16,0 L20,4 L20,16 L0,16 Z M16,0 L16,4 L20,4" fill={KIND_COLORS[kind]} opacity={0.2} stroke={KIND_COLORS[kind]} strokeWidth={0.8} />
-                    ) : kind === 'trigger' ? (
-                      <polygon points="11,0 22,6 14,6 15,16 0,10 8,10" fill={KIND_COLORS[kind]} opacity={0.3} stroke={KIND_COLORS[kind]} strokeWidth={0.8} />
-                    ) : kind === 'aimodel' ? (
-                      <>
-                        <rect x={1} y={1} width={20} height={14} rx={4} fill={KIND_COLORS[kind]} opacity={0.2} stroke={KIND_COLORS[kind]} strokeWidth={1.2} />
-                        <path d="M8,5 L11,3 L14,5 L11,7 Z" fill={KIND_COLORS[kind]} opacity={0.5} />
-                      </>
-                    ) : kind === 'vectorstore' ? (
-                      <>
-                        <ellipse cx={11} cy={4} rx={10} ry={3} fill={KIND_COLORS[kind]} opacity={0.25} stroke={KIND_COLORS[kind]} strokeWidth={0.8} />
-                        <path d="M1,4 L1,12 Q1,15 11,15 Q21,15 21,12 L21,4" fill={KIND_COLORS[kind]} opacity={0.15} stroke={KIND_COLORS[kind]} strokeWidth={0.8} />
-                      </>
-                    ) : kind === 'retriever' ? (
-                      <>
-                        <rect x={1} y={1} width={20} height={14} rx={2} fill={KIND_COLORS[kind]} opacity={0.15} stroke={KIND_COLORS[kind]} strokeWidth={0.8} />
-                        <circle cx={10} cy={7} r={3} fill="none" stroke={KIND_COLORS[kind]} strokeWidth={0.8} opacity={0.5} />
-                        <line x1={12} y1={9} x2={15} y2={12} stroke={KIND_COLORS[kind]} strokeWidth={0.8} opacity={0.5} />
-                      </>
-                    ) : kind === 'evaluation' ? (
-                      <rect x={1} y={1} width={20} height={14} rx={2} fill={KIND_COLORS[kind]} opacity={0.2} stroke={KIND_COLORS[kind]} strokeWidth={0.8} strokeDasharray="3 1" />
-                    ) : (
-                      <rect x={1} y={1} width={20} height={14} rx={3} fill={KIND_COLORS[kind]} opacity={0.25} stroke={KIND_COLORS[kind]} strokeWidth={kind === 'system' ? 1.5 : 0.8} />
-                    )}
-                  </svg>
-                  <span>{KIND_LABELS[kind]}</span>
-                </div>
-              ))}
-              {visibleEdgeTypes.length > 0 && (
-                <div style={{ borderTop: '1px solid var(--border, #DFE6E9)', marginTop: 4, paddingTop: 4 }}>
-                  {visibleEdgeTypes.map((et) => {
-                    const vis = EDGE_VISUALS[et];
-                    return (
-                      <div key={et} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                        <svg width={22} height={10} style={{ flexShrink: 0 }}>
-                          <line
-                            x1={0} y1={5} x2={16} y2={5}
-                            stroke={vis.stroke}
-                            strokeWidth={Math.min(vis.strokeWidth, 2)}
-                            strokeDasharray={vis.dashArray}
-                          />
-                          <polygon points="16,2 22,5 16,8" fill={vis.stroke} />
-                        </svg>
-                        <span>{EDGE_LABELS[et]}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </foreignObject>
-        </g>
-      )}
+      <CanvasLegend visibleKinds={visibleKinds} visibleEdgeTypes={visibleEdgeTypes} isGlobalView={isGlobalView} />
 
       {/* Space-key pan overlay: sits on top of everything so Space+drag overrides
           node interactions and lets the user freely pan across the infinite canvas. */}
@@ -1379,149 +1239,15 @@ export const DiagramCanvas: React.FC = () => {
     </svg>
 
     {/* Context menu */}
-    {contextMenu && (() => {
-      const close = () => setContextMenu(null);
-      const menuX = Math.min(contextMenu.x, window.innerWidth - 200);
-      const menuY = Math.min(contextMenu.y, window.innerHeight - 260);
-      const t = contextMenu.target;
-      const items: React.ReactNode[] = [];
-
-      if (t.kind === 'entity') {
-        const entity = entities.find((e) => e.id === t.id);
-        const entityKind = entity?.kind;
-        // Build "View in" navigation options: all valid (viewpoint, level) pairs for this kind
-        const viewInOptions: { vp: Viewpoint; level: ZoomLevel; label: string }[] = [];
-        if (entityKind) {
-          const kindLevel = KIND_TO_ZOOM[entityKind];
-          for (const vp of CONCRETE_VIEWPOINTS) {
-            const vpKinds = getViewpointsForKindLevel(entityKind, kindLevel);
-            if (vpKinds.includes(vp)) {
-              const isCurrent = vp === viewpoint && kindLevel === zoomLevel;
-              if (!isCurrent) {
-                viewInOptions.push({
-                  vp,
-                  level: kindLevel,
-                  label: `${VIEWPOINT_LABELS[vp]} · ${ZOOM_TITLES[kindLevel]}`,
-                });
-              }
-            }
-          }
-        }
-
-        items.push(
-          <button key="edit" className="ctx-item" onClick={() => { setShowEntityForm(true, t.id); close(); }}>
-            <Edit size={14} /><span>Edit Entity</span>
-          </button>,
-          <button key="drill" className="ctx-item" onClick={() => { drillDown(t.id); close(); }}>
-            <Eye size={14} /><span>Drill Down</span>
-          </button>,
-        );
-        if (viewInOptions.length > 0) {
-          items.push(
-            <div key="viewin-header" className="ctx-separator" />,
-            <div key="viewin-label" className="ctx-group-label">View in…</div>,
-          );
-          for (const opt of viewInOptions) {
-            items.push(
-              <button key={`viewin-${opt.vp}-${opt.level}`} className="ctx-item" onClick={() => {
-                setViewpoint(opt.vp);
-                setZoomLevel(opt.level);
-                close();
-              }}>
-                <Navigation size={14} /><span>{opt.label}</span>
-              </button>,
-            );
-          }
-        }
-        items.push(
-          <div key="sep" className="ctx-separator" />,
-          <button key="del" className="ctx-item ctx-item--danger" onClick={() => { deleteEntity(t.id); close(); }}>
-            <Trash2 size={14} /><span>Delete</span>
-          </button>,
-        );
-      } else if (t.kind === 'note') {
-        items.push(
-          <button key="edit" className="ctx-item" onClick={() => { setShowNoteForm(true, t.id); close(); }}>
-            <Edit size={14} /><span>Edit Note</span>
-          </button>,
-          <div key="sep" className="ctx-separator" />,
-          <button key="del" className="ctx-item ctx-item--danger" onClick={() => { deleteNote(t.id); close(); }}>
-            <Trash2 size={14} /><span>Delete</span>
-          </button>,
-        );
-      } else if (t.kind === 'boundary') {
-        items.push(
-          <button key="edit" className="ctx-item" onClick={() => { setShowBoundaryForm(true, t.id); close(); }}>
-            <Edit size={14} /><span>Edit Boundary</span>
-          </button>,
-          <div key="sep" className="ctx-separator" />,
-          <button key="del" className="ctx-item ctx-item--danger" onClick={() => { deleteBoundary(t.id); close(); }}>
-            <Trash2 size={14} /><span>Delete</span>
-          </button>,
-        );
-      } else if (t.kind === 'relationship') {
-        items.push(
-          <button key="edit" className="ctx-item" onClick={() => { setShowRelationshipForm(true, t.id); close(); }}>
-            <Edit size={14} /><span>Edit Relationship</span>
-          </button>,
-          <div key="sep" className="ctx-separator" />,
-          <button key="del" className="ctx-item ctx-item--danger" onClick={() => { deleteRelationship(t.id); close(); }}>
-            <Trash2 size={14} /><span>Delete</span>
-          </button>,
-        );
-      } else if (t.kind === 'canvas') {
-        const kindsForZoom = getValidKindsForViewpoint(viewpoint, zoomLevel);
-        const defaultKind = (kindsForZoom.length > 0 ? kindsForZoom[kindsForZoom.length - 1] : 'system') as EntityKind;
-        items.push(
-          <button key="add-entity" className="ctx-item" onClick={() => {
-            const id = addEntity({
-              name: `New ${defaultKind.charAt(0).toUpperCase() + defaultKind.slice(1)}`,
-              shortName: defaultKind.slice(0, 3).toUpperCase(),
-              description: '', kind: defaultKind,
-              viewpoint,
-              parentId: focusEntityId,
-              metadata: { tags: [] }, responsibilities: [],
-            });
-            setPosition(id, snapVal(t.worldX), snapVal(t.worldY));
-            setManualLayout(true); selectEntity(id); close();
-          }}>
-            <Plus size={14} /><span>Add Entity</span>
-          </button>,
-          <button key="add-note" className="ctx-item" onClick={() => {
-            const id = addNote('New note');
-            updateNote(id, { x: snapVal(t.worldX), y: snapVal(t.worldY) }); close();
-          }}>
-            <StickyNote size={14} /><span>Add Note</span>
-          </button>,
-          <button key="add-boundary" className="ctx-item" onClick={() => {
-            const id = addBoundary('Boundary');
-            updateBoundary(id, { x: snapVal(t.worldX), y: snapVal(t.worldY) }); close();
-          }}>
-            <Square size={14} /><span>Add Boundary</span>
-          </button>,
-          <div key="sep" className="ctx-separator" />,
-          <button key="auto-layout" className="ctx-item" onClick={() => { autoLayout(); close(); }}>
-            <LayoutGrid size={14} /><span>Auto Layout</span>
-          </button>,
-          <button key="reset" className="ctx-item" onClick={() => { setPan(0, 0); setScale(1); close(); }}>
-            <RotateCcw size={14} /><span>Reset View</span>
-          </button>,
-        );
-      }
-
-      return (
-        <>
-          <div className="ctx-backdrop" onClick={close} onContextMenu={(e) => { e.preventDefault(); close(); }} />
-          <div
-            className="canvas-context-menu"
-            style={{ left: menuX, top: menuY }}
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            {items}
-          </div>
-        </>
-      );
-    })()}
+    {contextMenu && (
+      <CanvasContextMenu
+        target={contextMenu.target}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={() => setContextMenu(null)}
+        snapVal={snapVal}
+      />
+    )}
     </>
   );
 };

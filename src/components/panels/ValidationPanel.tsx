@@ -17,6 +17,9 @@ export const ValidationPanel: React.FC = () => {
       <button
         className={`btn btn-sm validation-toggle ${show ? 'btn-active' : ''}`}
         onClick={() => setShow(!show)}
+        title={show ? 'Hide validation results' : 'Validate model'}
+        aria-label={show ? 'Hide validation results' : 'Validate model'}
+        aria-expanded={show}
       >
         <SearchCheck size={14} /> Validate {show && errors.length > 0 && (
           <span className="validation-count">

@@ -54,6 +54,45 @@ const App: React.FC = () => {
 
   const isImmersive = uiMode !== 'normal';
 
+  // ── Browser Fullscreen API ─────────────────────────────────
+  // Enter fullscreen whenever an immersive mode is activated; exit on normal.
+  useEffect(() => {
+    if (uiMode !== 'normal') {
+      const el = document.documentElement as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>;
+        mozRequestFullScreen?: () => Promise<void>;
+      };
+      const req = el.requestFullscreen?.bind(el)
+        ?? el.webkitRequestFullscreen?.bind(el)
+        ?? el.mozRequestFullScreen?.bind(el);
+      req?.().catch(() => { /* user or browser denied fullscreen — no-op */ });
+    } else {
+      const doc = document as Document & {
+        webkitExitFullscreen?: () => Promise<void>;
+        mozCancelFullScreen?: () => Promise<void>;
+      };
+      const exit = doc.exitFullscreen?.bind(doc)
+        ?? doc.webkitExitFullscreen?.bind(doc)
+        ?? doc.mozCancelFullScreen?.bind(doc);
+      if (document.fullscreenElement) exit?.().catch(() => {});
+    }
+  }, [uiMode]);
+
+  // Sync store back to normal when the user exits fullscreen via browser Esc
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement && uiMode !== 'normal') {
+        setUiMode('normal');
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+    };
+  }, [uiMode, setUiMode]);
+
   const [leftWidth, setLeftWidth] = useState(240);
   const [rightWidth, setRightWidth] = useState(300);
   const [logHeight, setLogHeight] = useState(200);
@@ -186,8 +225,8 @@ const App: React.FC = () => {
   return (
     <div className={`app${isImmersive ? ' app--immersive' : ''}`}>
       {!isImmersive && <MemoToolbar />}
-      {!isImmersive && <ContextControlBar />}
-      {!isImmersive && (
+      {!isImmersive && !showListView && <ContextControlBar />}
+      {!isImmersive && !showListView && (
         <div className="diagram-nav-bar">
           <button
             className={`panel-toggle-btn ${leftSidebarOpen ? 'panel-toggle-btn--active' : ''}`}
@@ -245,8 +284,10 @@ const App: React.FC = () => {
               <CanvasControls />
               {!isImmersive && (
                 <div className="canvas-footer">
-                  <MemoValidation />
-                  <MemoViewManager />
+                  <div className="canvas-footer-controls">
+                    <MemoValidation />
+                    <MemoViewManager />
+                  </div>
                 </div>
               )}
             </div>

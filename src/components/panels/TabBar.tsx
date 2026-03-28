@@ -66,6 +66,7 @@ export const TabBar: React.FC = () => {
               className="tab-bar-close"
               onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
               aria-label={`Close ${tab.name}`}
+              title={`Close ${tab.name}`}
             >
               <X size={12} />
             </button>
