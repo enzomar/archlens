@@ -86,10 +86,13 @@ export const DiagramCanvas: React.FC = () => {
     overEntityId: string | null;
   } | null>(null);
 
+  const [rubberBand, setRubberBand] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+
   const entities = useStore((s) => s.entities);
   const relationships = useStore((s) => s.relationships);
   const positions = useStore((s) => s.positions);
   const selectedEntityId = useStore((s) => s.selectedEntityId);
+  const selectedEntityIds = useStore((s) => s.selectedEntityIds);
   const selectedRelationshipId = useStore((s) => s.selectedRelationshipId);
   const visualConfig = useStore((s) => s.visualConfig);
   const panX = useStore((s) => s.panX);
@@ -97,6 +100,10 @@ export const DiagramCanvas: React.FC = () => {
   const scale = useStore((s) => s.scale);
 
   const selectEntity = useStore((s) => s.selectEntity);
+  const toggleSelectEntity = useStore((s) => s.toggleSelectEntity);
+  const selectEntities = useStore((s) => s.selectEntities);
+  const clearMultiSelect = useStore((s) => s.clearMultiSelect);
+  const deleteSelectedEntities = useStore((s) => s.deleteSelectedEntities);
   const selectRelationship = useStore((s) => s.selectRelationship);
   const setShowRelationshipForm = useStore((s) => s.setShowRelationshipForm);
   const openNewRelationship = useStore((s) => s.openNewRelationship);
@@ -212,7 +219,10 @@ export const DiagramCanvas: React.FC = () => {
 
       if ((e.key === 'Delete' || e.key === 'Backspace') && !e.repeat) {
         const state = useStore.getState();
-        if (state.selectedEntityId) {
+        if (state.selectedEntityIds.size > 0) {
+          e.preventDefault();
+          state.deleteSelectedEntities();
+        } else if (state.selectedEntityId) {
           e.preventDefault();
           state.deleteEntity(state.selectedEntityId);
         } else if (state.selectedNoteId) {
@@ -277,6 +287,17 @@ export const DiagramCanvas: React.FC = () => {
     if (isReadOnly) return;
     const pos = posMap.get(entityId);
     if (!pos) return;
+    // If this entity is part of a multi-selection, bulk-drag all selected
+    const state = useStore.getState();
+    if (state.selectedEntityIds.size > 1 && state.selectedEntityIds.has(entityId)) {
+      // Store offsets for all selected entities
+      setDragging({
+        entityId, // anchor entity
+        offsetX: clientX / scale - pos.x - panX / scale,
+        offsetY: clientY / scale - pos.y - panY / scale,
+      });
+      return;
+    }
     setDragging({
       entityId,
       offsetX: clientX / scale - pos.x - panX / scale,
@@ -424,10 +445,32 @@ export const DiagramCanvas: React.FC = () => {
       setConnecting({ ...connecting, curX: wx, curY: wy, overEntityId });
       return;
     }
+    if (rubberBand) {
+      const svgRect = svgRef.current?.getBoundingClientRect();
+      if (!svgRect) return;
+      const wx = (e.clientX - svgRect.left - panX) / scale;
+      const wy = (e.clientY - svgRect.top - panY) / scale;
+      setRubberBand({ ...rubberBand, endX: wx, endY: wy });
+      return;
+    }
     if (dragging) {
       const newX = snapVal(e.clientX / scale - dragging.offsetX - panX / scale);
       const newY = snapVal(e.clientY / scale - dragging.offsetY - panY / scale);
-      setPosition(dragging.entityId, newX, newY);
+      const state = useStore.getState();
+      // Bulk drag: move all selected entities by the same delta
+      if (state.selectedEntityIds.size > 1 && state.selectedEntityIds.has(dragging.entityId)) {
+        const anchorPos = posMap.get(dragging.entityId);
+        if (anchorPos) {
+          const dx = newX - anchorPos.x;
+          const dy = newY - anchorPos.y;
+          for (const id of state.selectedEntityIds) {
+            const p = posMap.get(id);
+            if (p) setPosition(id, snapVal(p.x + dx), snapVal(p.y + dy));
+          }
+        }
+      } else {
+        setPosition(dragging.entityId, newX, newY);
+      }
     } else if (draggingNote) {
       const newX = snapVal(e.clientX / scale - draggingNote.offsetX - panX / scale);
       const newY = snapVal(e.clientY / scale - draggingNote.offsetY - panY / scale);
@@ -437,9 +480,32 @@ export const DiagramCanvas: React.FC = () => {
       const newY = snapVal(e.clientY / scale - draggingBoundary.offsetY - panY / scale);
       updateBoundary(draggingBoundary.boundaryId, { x: newX, y: newY });
     }
-  }, [resizing, connecting, dragging, draggingNote, draggingBoundary, scale, panX, panY, snap, visibleEntities, posMap, visualConfig.nodeDisplayMode]);
+  }, [rubberBand, resizing, connecting, dragging, draggingNote, draggingBoundary, scale, panX, panY, snap, visibleEntities, posMap, visualConfig.nodeDisplayMode]);
 
   const handleMouseUp = useCallback(() => {
+    if (rubberBand) {
+      // Compute entities within the rubber-band rectangle
+      const x1 = Math.min(rubberBand.startX, rubberBand.endX);
+      const y1 = Math.min(rubberBand.startY, rubberBand.endY);
+      const x2 = Math.max(rubberBand.startX, rubberBand.endX);
+      const y2 = Math.max(rubberBand.startY, rubberBand.endY);
+      const DIMS_MAP = visualConfig.nodeDisplayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
+      const hitIds: string[] = [];
+      for (const entity of visibleEntities) {
+        const pos = posMap.get(entity.id);
+        if (!pos) continue;
+        const d = DIMS_MAP[entity.kind];
+        // Entity overlaps selection rect
+        if (pos.x + d.width >= x1 && pos.x <= x2 && pos.y + d.height >= y1 && pos.y <= y2) {
+          hitIds.push(entity.id);
+        }
+      }
+      if (hitIds.length > 0) {
+        selectEntities(hitIds);
+      }
+      setRubberBand(null);
+      return;
+    }
     if (connecting) {
       if (connecting.overEntityId) {
         openNewRelationship(connecting.sourceId, connecting.overEntityId);
@@ -455,7 +521,7 @@ export const DiagramCanvas: React.FC = () => {
     setDraggingBoundary(null);
     setResizing(null);
     setPanning(null);
-  }, [connecting, dragging, openNewRelationship, setManualLayout]);
+  }, [rubberBand, connecting, dragging, openNewRelationship, setManualLayout, visibleEntities, posMap, visualConfig.nodeDisplayMode]);
 
   // Start a drag-to-connect from an entity's border
   const handleConnectStart = useCallback((sourceId: string, clientX: number, clientY: number) => {
@@ -465,13 +531,23 @@ export const DiagramCanvas: React.FC = () => {
     setConnecting({ sourceId, curX, curY, overEntityId: null });
   }, [isReadOnly, panX, panY, scale]);
 
-  // Background rect: left-click on empty canvas space → deselect all + pan
+  // Background rect: left-click on empty canvas space → deselect all + pan (or rubber-band with Shift)
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
+    if (e.shiftKey && !isReadOnly) {
+      // Start rubber-band selection
+      const svgRect = svgRef.current?.getBoundingClientRect();
+      if (!svgRect) return;
+      const wx = (e.clientX - svgRect.left - panX) / scale;
+      const wy = (e.clientY - svgRect.top - panY) / scale;
+      setRubberBand({ startX: wx, startY: wy, endX: wx, endY: wy });
+      return;
+    }
     selectEntity(null);
     selectRelationship(null);
+    clearMultiSelect();
     setPanning({ startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY });
-  }, [panX, panY]);
+  }, [panX, panY, scale, isReadOnly]);
 
   // SVG level: middle-button (button=1) always pans regardless of what's under the cursor
   const handleSvgMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -981,9 +1057,15 @@ export const DiagramCanvas: React.FC = () => {
                 entity={entity}
                 x={pos.x}
                 y={pos.y}
-                selected={selectedEntityId === entity.id}
+                selected={selectedEntityId === entity.id || selectedEntityIds.has(entity.id)}
                 visualConfig={visualConfig}
-                onSelect={selectEntity}
+                onSelect={(id, e) => {
+                  if (e?.shiftKey) {
+                    toggleSelectEntity(id);
+                  } else {
+                    selectEntity(id);
+                  }
+                }}
                 onDrillDown={drillDown}
                 onDragStart={handleDragStart}
                 onConnectStart={isReadOnly ? undefined : handleConnectStart}
@@ -1100,6 +1182,24 @@ export const DiagramCanvas: React.FC = () => {
             );
           })()}
         </g>
+
+        {/* ── Rubber-band selection rectangle ── */}
+        {rubberBand && (() => {
+          const x = Math.min(rubberBand.startX, rubberBand.endX);
+          const y = Math.min(rubberBand.startY, rubberBand.endY);
+          const w = Math.abs(rubberBand.endX - rubberBand.startX);
+          const h = Math.abs(rubberBand.endY - rubberBand.startY);
+          return (
+            <rect
+              x={x} y={y} width={w} height={h}
+              fill="rgba(9, 132, 227, 0.08)"
+              stroke="var(--accent, #0984E3)"
+              strokeWidth={1}
+              strokeDasharray="4 2"
+              pointerEvents="none"
+            />
+          );
+        })()}
 
         {/* ── Layer 3 (highest): Notes ── */}
         <g className="layer-notes">

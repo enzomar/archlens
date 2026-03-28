@@ -206,6 +206,12 @@ export interface ArchLensState {
 
   selectEntity: (id: string | null) => void;
   selectRelationship: (id: string | null) => void;
+  // Multi-select
+  selectedEntityIds: Set<string>;
+  toggleSelectEntity: (id: string) => void;
+  selectEntities: (ids: string[]) => void;
+  clearMultiSelect: () => void;
+  deleteSelectedEntities: () => void;
   setShowEntityForm: (show: boolean, editId?: string | null) => void;
   editingRelationshipId: string | null;
   setShowRelationshipForm: (show: boolean, editId?: string | null) => void;
@@ -330,6 +336,7 @@ export const useStore = create<ArchLensState>()(
 
   selectedEntityId: null,
   selectedRelationshipId: null,
+  selectedEntityIds: new Set<string>(),
   showEntityForm: false,
   showRelationshipForm: false,
   showExportPanel: false,
@@ -576,9 +583,28 @@ export const useStore = create<ArchLensState>()(
 
   // ── UI State ────────────────────────────────────────────────
 
-  selectEntity: (id) => set({ selectedEntityId: id, selectedRelationshipId: null, selectedNoteId: null, selectedBoundaryId: null }),
+  selectEntity: (id) => set({ selectedEntityId: id, selectedEntityIds: new Set<string>(), selectedRelationshipId: null, selectedNoteId: null, selectedBoundaryId: null }),
 
-  selectRelationship: (id) => set({ selectedRelationshipId: id, selectedEntityId: null, selectedNoteId: null, selectedBoundaryId: null }),
+  selectRelationship: (id) => set({ selectedRelationshipId: id, selectedEntityId: null, selectedEntityIds: new Set<string>(), selectedNoteId: null, selectedBoundaryId: null }),
+
+  toggleSelectEntity: (id) => {
+    const s = get();
+    const next = new Set(s.selectedEntityIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    set({ selectedEntityIds: next, selectedEntityId: next.size === 1 ? [...next][0] : null, selectedRelationshipId: null, selectedNoteId: null, selectedBoundaryId: null });
+  },
+  selectEntities: (ids) => set({ selectedEntityIds: new Set(ids), selectedEntityId: ids.length === 1 ? ids[0] : null, selectedRelationshipId: null, selectedNoteId: null, selectedBoundaryId: null }),
+  clearMultiSelect: () => set({ selectedEntityIds: new Set<string>() }),
+  deleteSelectedEntities: () => {
+    const s = get();
+    const ids = s.selectedEntityIds;
+    if (ids.size === 0) return;
+    const newEntities = s.entities.filter((e) => !ids.has(e.id));
+    const newRels = s.relationships.filter((r) => !ids.has(r.sourceId) && !ids.has(r.targetId));
+    const newPositions = s.positions.filter((p) => !ids.has(p.entityId));
+    set({ entities: newEntities, relationships: newRels, positions: newPositions, selectedEntityIds: new Set<string>(), selectedEntityId: null });
+  },
 
   setShowEntityForm: (show, editId = null) =>
     set({ showEntityForm: show, editingEntityId: editId }),

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Toolbar } from './components/toolbar/Toolbar';
 import { DiagramCanvas } from './components/canvas/DiagramCanvas';
 import { DetailPanel } from './components/panels/DetailPanel';
@@ -17,6 +17,7 @@ import { BoundaryForm } from './components/forms/BoundaryForm';
 import { ExportPanel } from './components/panels/ExportPanel';
 import { ValidationPanel } from './components/panels/ValidationPanel';
 import { ViewManager } from './components/panels/ViewManager';
+import { CommandPalette } from './components/panels/CommandPalette';
 import { useStore } from './store/useStore';
 import { exportProject } from './export/exportService';
 import { ContextControlBar } from './components/nav/ContextControlBar';
@@ -58,6 +59,7 @@ const App: React.FC = () => {
   const [logHeight, setLogHeight] = useState(200);
   const [logFullScreen, setLogFullScreen] = useState(false);
   const [detailCollapsed, setDetailCollapsed] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
 
   const onResizeLeft = useCallback((delta: number) => {
     setLeftWidth((w) => Math.min(500, Math.max(160, w + delta)));
@@ -76,6 +78,51 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // ── Autosave to localStorage with crash recovery ──────────
+  const AUTOSAVE_KEY = 'archlens-autosave';
+  const AUTOSAVE_TS_KEY = 'archlens-autosave-ts';
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const recoveryDismissed = useRef(false);
+
+  // On mount: attempt crash recovery
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(AUTOSAVE_KEY);
+      const ts = localStorage.getItem(AUTOSAVE_TS_KEY);
+      if (saved && !recoveryDismissed.current) {
+        const project = JSON.parse(saved);
+        if (project && project.entities && project.entities.length > 0) {
+          const when = ts ? new Date(Number(ts)).toLocaleString() : 'unknown time';
+          const doRecover = window.confirm(
+            `ArchLens found an autosaved project from ${when} with ${project.entities.length} entities.\n\nRestore it?`
+          );
+          if (doRecover) {
+            useStore.getState().loadProject(project);
+          } else {
+            localStorage.removeItem(AUTOSAVE_KEY);
+            localStorage.removeItem(AUTOSAVE_TS_KEY);
+          }
+        }
+        recoveryDismissed.current = true;
+      }
+    } catch { /* ignore corrupt data */ }
+  }, []);
+
+  // Debounced autosave: subscribe to store changes
+  useEffect(() => {
+    const unsub = useStore.subscribe(() => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = setTimeout(() => {
+        try {
+          const project = useStore.getState().getProject();
+          localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(project));
+          localStorage.setItem(AUTOSAVE_TS_KEY, String(Date.now()));
+        } catch { /* quota exceeded — silently fail */ }
+      }, 2000);
+    });
+    return () => unsub();
+  }, []);
+
   // Keyboard shortcuts for immersive modes + undo/redo/save
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -83,6 +130,13 @@ const App: React.FC = () => {
 
       const ctrl = e.metaKey || e.ctrlKey;
       const key = e.key.toLowerCase();
+
+      // Command palette: Ctrl+Shift+P or Cmd+Shift+P
+      if (ctrl && e.shiftKey && key === 'p') {
+        e.preventDefault();
+        setShowCommandPalette((s) => !s);
+        return;
+      }
 
       if (ctrl && !e.shiftKey && key === 'z') {
         e.preventDefault();
@@ -286,6 +340,7 @@ const App: React.FC = () => {
       <NoteForm />
       <BoundaryForm />
       <ExportPanel />
+      {showCommandPalette && <CommandPalette onClose={() => setShowCommandPalette(false)} />}
     </div>
   );
 };

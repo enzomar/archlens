@@ -8,7 +8,7 @@ interface EntityNodeProps {
   y: number;
   selected: boolean;
   visualConfig: VisualConfig;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, e?: React.MouseEvent) => void;
   onDrillDown: (id: string) => void;
   onDragStart: (id: string, startX: number, startY: number) => void;
   onConnectStart?: (id: string, clientX: number, clientY: number) => void;
@@ -324,7 +324,7 @@ export const EntityNode: React.FC<EntityNodeProps> = ({
     if (e.detail === 2) {
       onDrillDown(entity.id);
     } else {
-      onSelect(entity.id);
+      onSelect(entity.id, e);
       onDragStart(entity.id, e.clientX, e.clientY);
     }
   };

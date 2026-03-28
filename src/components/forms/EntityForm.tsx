@@ -100,6 +100,10 @@ export const EntityForm: React.FC = () => {
   const [codeRepository, setCodeRepository] = useState('');
   const [pii, setPii] = useState(false);
   const [pciDss, setPciDss] = useState(false);
+  const [adrUrl, setAdrUrl] = useState('');
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'identity' | 'classification' | 'compliance' | 'relationships'>('identity');
 
   // Relationship inline editing state
   interface RelDraft { direction: 'outgoing' | 'incoming'; targetId: string; type: EdgeType; label: string; protocol: string; description: string; existingId?: string; }
@@ -171,6 +175,7 @@ export const EntityForm: React.FC = () => {
       setCodeRepository(editing.metadata.codeRepository ?? '');
       setPii(editing.metadata.pii ?? false);
       setPciDss(editing.metadata.pciDss ?? false);
+      setAdrUrl(editing.metadata.adrUrl ?? '');
       // Load existing relationships for this entity
       const entityRels = relationships.filter((r) => r.sourceId === editing.id || r.targetId === editing.id);
       setRelDrafts(entityRels.map((r) => ({

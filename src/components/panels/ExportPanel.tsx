@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useStore } from '../../store/useStore';
-import { exportEntitiesCsv, exportRelationshipsCsv, exportExcel, exportProject } from '../../export/exportService';
-import { Save, Table, Link, FileSpreadsheet, X } from 'lucide-react';
+import { exportEntitiesCsv, exportRelationshipsCsv, exportExcel, exportProject, exportSvg, exportPng, exportPlantUml, exportStructurizrDsl } from '../../export/exportService';
+import { Save, Table, Link, FileSpreadsheet, X, Image, FileCode, FileText, Code2 } from 'lucide-react';
 
 export const ExportPanel: React.FC = () => {
   const show = useStore((s) => s.showExportPanel);
@@ -81,6 +81,38 @@ export const ExportPanel: React.FC = () => {
             <div className="export-icon" aria-hidden="true"><FileSpreadsheet size={24} /></div>
             <h4>Excel (TSV)</h4>
             <p>Combined entities and relationships in tab-separated format for Excel.</p>
+          </button>
+
+          <button className="export-card" onClick={() => {
+            const svg = document.getElementById('main-canvas') as unknown as SVGSVGElement;
+            if (svg) { exportSvg(svg, getProject().name); }
+            setShow(false);
+          }}>
+            <div className="export-icon" aria-hidden="true"><FileCode size={24} /></div>
+            <h4>SVG Image</h4>
+            <p>Scalable vector graphic of the current diagram view.</p>
+          </button>
+
+          <button className="export-card" onClick={() => {
+            const svg = document.getElementById('main-canvas') as unknown as SVGSVGElement;
+            if (svg) { exportPng(svg, getProject().name); }
+            setShow(false);
+          }}>
+            <div className="export-icon" aria-hidden="true"><Image size={24} /></div>
+            <h4>PNG Image</h4>
+            <p>Raster image of the current diagram (2x resolution).</p>
+          </button>
+
+          <button className="export-card" onClick={() => { exportPlantUml(entities, relationships, getProject().name); setShow(false); }}>
+            <div className="export-icon" aria-hidden="true"><FileText size={24} /></div>
+            <h4>PlantUML</h4>
+            <p>C4-PlantUML markup for Confluence, CI/CD pipelines, and wikis.</p>
+          </button>
+
+          <button className="export-card" onClick={() => { exportStructurizrDsl(entities, relationships, getProject().name); setShow(false); }}>
+            <div className="export-icon" aria-hidden="true"><Code2 size={24} /></div>
+            <h4>Structurizr DSL</h4>
+            <p>Structurizr workspace definition for diagram-as-code workflows.</p>
           </button>
         </div>
       </div>

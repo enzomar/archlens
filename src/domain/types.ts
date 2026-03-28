@@ -75,6 +75,7 @@ export interface EntityMetadata {
   codeRepository?: string;
   pii?: boolean;
   pciDss?: boolean;
+  adrUrl?: string;
 }
 
 // ─── RELATIONSHIP ────────────────────────────────────────────────
