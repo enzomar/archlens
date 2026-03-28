@@ -6,7 +6,7 @@ import { NavigatorPanel } from './components/panels/NavigatorPanel';
 import { LogPanel } from './components/panels/LogPanel';
 import { TabBar } from './components/panels/TabBar';
 import { EntityListView } from './components/panels/EntityListView';
-import { PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, ChevronDown, ChevronRight, ZoomIn, ZoomOut, X, Home } from 'lucide-react';
+import { PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, ChevronDown, ChevronRight, ZoomIn, ZoomOut, X, Home, LayoutList, Network, Maximize2, Minimize2 } from 'lucide-react';
 import { CanvasControls } from './components/canvas/CanvasControls';
 import { ResizeHandle } from './components/panels/ResizeHandle';
 import { ShapePalette } from './components/panels/ShapePalette';
@@ -38,6 +38,7 @@ const App: React.FC = () => {
   const leftSidebarOpen = useStore((s) => s.leftSidebarOpen);
   const logPanelOpen = useStore((s) => s.logPanelOpen);
   const showListView = useStore((s) => s.showListView);
+  const toggleListView = useStore((s) => s.toggleListView);
   const theme = useStore((s) => s.theme);
   const toggleLeftSidebar = useStore((s) => s.toggleLeftSidebar);
   const toggleRightSidebar = useStore((s) => s.toggleRightSidebar);
@@ -51,6 +52,11 @@ const App: React.FC = () => {
   const drillTo = useStore((s) => s.drillTo);
   const setZoomLevel = useStore((s) => s.setZoomLevel);
   const setViewpoint = useStore((s) => s.setViewpoint);
+
+  const autosaveEnabled  = useStore((s) => s.autosaveEnabled);
+  const autosaveInterval = useStore((s) => s.autosaveInterval);
+  const showValidationPanel = useStore((s) => s.showValidationPanel);
+  const showViewsPanel      = useStore((s) => s.showViewsPanel);
 
   const isImmersive = uiMode !== 'normal';
 
@@ -149,6 +155,7 @@ const App: React.FC = () => {
 
   // Debounced autosave: subscribe to store changes
   useEffect(() => {
+    if (!autosaveEnabled) return;
     const unsub = useStore.subscribe(() => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
       autosaveTimer.current = setTimeout(() => {
@@ -157,10 +164,10 @@ const App: React.FC = () => {
           localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(project));
           localStorage.setItem(AUTOSAVE_TS_KEY, String(Date.now()));
         } catch { /* quota exceeded — silently fail */ }
-      }, 2000);
+      }, autosaveInterval * 1000);
     });
     return () => unsub();
-  }, []);
+  }, [autosaveEnabled, autosaveInterval]);
 
   // Keyboard shortcuts for immersive modes + undo/redo/save
   useEffect(() => {
@@ -193,18 +200,18 @@ const App: React.FC = () => {
         return;
       }
 
-      // Zoom shortcuts: 1 / 2 / 3
+      // Zoom shortcuts: 1 / 2 / 3 — toggle level in multi-select
       const ZOOM_KEYS: Record<string, ZoomLevel> = { '1': 'context', '2': 'container', '3': 'component' };
       if (!ctrl && ZOOM_KEYS[e.key]) {
         e.preventDefault();
-        setZoomLevel(ZOOM_KEYS[e.key]);
+        useStore.getState().toggleActiveZoomLevel(ZOOM_KEYS[e.key]);
         return;
       }
-      // Viewpoint shortcuts: b / a / t / g
-      const VP_KEYS: Record<string, Viewpoint> = { b: 'business', a: 'application', t: 'technical', g: 'global' };
+      // Viewpoint shortcuts: b / a / t — toggle viewpoint in multi-select
+      const VP_KEYS: Record<string, Viewpoint> = { b: 'business', a: 'application', t: 'technical' };
       if (!ctrl && VP_KEYS[key]) {
         e.preventDefault();
-        setViewpoint(VP_KEYS[key]);
+        useStore.getState().toggleActiveViewpoint(VP_KEYS[key]);
         return;
       }
 
@@ -256,6 +263,36 @@ const App: React.FC = () => {
             </nav>
           )}
           <div className="panel-toggles-spacer" />
+          <div className="nav-bar-view-btns">
+            <button
+              className={`panel-toggle-btn${!showListView ? ' panel-toggle-btn--active' : ''}`}
+              onClick={showListView ? toggleListView : undefined}
+              title="Diagram canvas"
+              aria-pressed={!showListView}
+              aria-label="Switch to diagram canvas"
+            >
+              <Network size={14} />
+            </button>
+            <button
+              className={`panel-toggle-btn${showListView ? ' panel-toggle-btn--active' : ''}`}
+              onClick={!showListView ? toggleListView : undefined}
+              title="List view"
+              aria-pressed={showListView}
+              aria-label="Switch to list view"
+            >
+              <LayoutList size={14} />
+            </button>
+          </div>
+          <div className="nav-bar-sep" />
+          <button
+            className="panel-toggle-btn"
+            onClick={() => setUiMode(uiMode === 'distraction-free' ? 'normal' : 'distraction-free')}
+            title={uiMode === 'distraction-free' ? 'Exit fullscreen (F11)' : 'Fullscreen (F11)'}
+            aria-label={uiMode === 'distraction-free' ? 'Exit fullscreen' : 'Fullscreen'}
+          >
+            {uiMode === 'distraction-free' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </button>
+          <div className="nav-bar-sep" />
           <button
             className={`panel-toggle-btn ${rightSidebarOpen ? 'panel-toggle-btn--active' : ''}`}
             onClick={toggleRightSidebar}
@@ -285,15 +322,15 @@ const App: React.FC = () => {
               {!isImmersive && (
                 <div className="canvas-footer">
                   <div className="canvas-footer-controls">
-                    <MemoValidation />
-                    <MemoViewManager />
+                    {showValidationPanel && <MemoValidation />}
+                    {showViewsPanel && <MemoViewManager />}
                   </div>
                 </div>
               )}
             </div>
           )}
         </div>
-        {rightSidebarOpen && !isImmersive && (
+        {rightSidebarOpen && !isImmersive && !showListView && (
           <>
             <ResizeHandle direction="horizontal" onResize={onResizeRight} />
             <div className="right-sidebar" style={{ width: rightWidth, minWidth: 200, maxWidth: 500, flexShrink: 0 }}>

@@ -1,0 +1,733 @@
+/* ═══════════════════════════════════════════════════════════════
+   Canvas — Controls, zoom, minimap, entity nodes, edges,
+            context menu, extended card, context control bar
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── CANVAS CONTROLS (zoom + minimap) ──────────────────────── */
+
+.canvas-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+/* ── Zoom bar ─── */
+
+.canvas-zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 3px 4px;
+  box-shadow: var(--shadow-sm);
+}
+
+.canvas-zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.canvas-zoom-btn:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+.canvas-zoom-btn--active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.canvas-zoom-btn--active:hover {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.canvas-zoom-level {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 38px;
+  text-align: center;
+  user-select: none;
+}
+
+.canvas-zoom-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+/* ── Mini-map ─── */
+
+.canvas-minimap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.canvas-minimap-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.canvas-minimap-toggle:hover {
+  background: var(--surface-alt);
+}
+
+.canvas-minimap--open .canvas-minimap-toggle {
+  border-bottom: 1px solid var(--border);
+}
+
+.canvas-minimap-svg {
+  display: block;
+  cursor: crosshair;
+}
+
+.canvas-minimap-empty {
+  padding: 16px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  font-style: italic;
+}
+
+/* ── DIAGRAM CANVAS ────────────────────────────────────────── */
+
+.diagram-canvas {
+  flex: 1;
+  cursor: grab;
+}
+
+.diagram-canvas:active {
+  cursor: grabbing;
+}
+
+.entity-node {
+  transition: opacity 0.3s ease;
+}
+
+.entity-node--selected {
+  filter: drop-shadow(0 0 8px rgba(108, 92, 231, 0.4));
+}
+
+.entity-label {
+  pointer-events: none;
+  user-select: none;
+}
+
+.entity-kind-label {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── EXTENDED CARD (Zoned Grid Layout) ─────────────────────── */
+
+.ext-card {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-radius: 8px;
+  font-family: var(--font, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  pointer-events: none;
+  user-select: none;
+  position: relative;
+}
+
+/* ── ZONE 1: HEADER ── */
+.ext-header {
+  position: relative;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  min-height: 0;
+}
+
+.ext-header-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 0;
+}
+
+.ext-code-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  padding: 1px 5px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.ext-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--canvas-text, #2D3436);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.ext-context-badges {
+  flex-shrink: 0;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.ext-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  font-size: 7px;
+  font-weight: 700;
+  border-radius: 3px;
+  white-space: nowrap;
+  line-height: 1.3;
+  letter-spacing: 0.3px;
+}
+
+.ext-badge--pii {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.ext-badge--pci {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: color-mix(in srgb, var(--warning) 85%, #000);
+}
+
+.ext-kind-badge {
+  position: absolute;
+  top: -1px;
+  right: 8px;
+  padding: 2px 8px;
+  font-size: 7px;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 0 0 4px 4px;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+}
+
+/* ── ZONE 2: DESCRIPTION ── */
+.ext-desc {
+  padding: 4px 10px;
+  font-size: 9px;
+  line-height: 1.35;
+  color: var(--canvas-text-secondary, #636E72);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
+
+/* ── ZONE 3: CLASSIFICATION STRIP ── */
+.ext-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  border-top: 1px solid rgba(0,0,0,0.04);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  min-height: 18px;
+}
+
+.ext-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--canvas-text-secondary, #636E72);
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 3px;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.ext-chip--stage {
+  background: rgba(37,99,235,0.08);
+  color: #2563EB;
+  border-color: rgba(37,99,235,0.15);
+}
+
+/* ── ZONE 4: CONTENT AREA ── */
+.ext-content {
+  display: flex;
+  gap: 6px;
+  padding: 5px 10px;
+  min-height: 0;
+  overflow: hidden;
+  flex: 1;
+}
+
+/* LEFT: Metrics column */
+.ext-metrics {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 70px;
+  max-width: 100px;
+}
+
+.ext-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ext-metric-label {
+  font-size: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--canvas-text-secondary, #636E72);
+  opacity: 0.7;
+  line-height: 1.2;
+}
+
+.ext-metric-value {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--canvas-text, #2D3436);
+  line-height: 1.3;
+}
+
+/* RIGHT: Technology chips */
+.ext-tech {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-content: flex-start;
+  justify-content: flex-end;
+  overflow: hidden;
+}
+
+.ext-tech-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--canvas-text-secondary, #636E72);
+  background: rgba(0,0,0,0.03);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 3px;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+/* Drill-down indicator */
+.ext-drill {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  font-size: 12px;
+  opacity: 0.5;
+  line-height: 1;
+}
+
+.edge-label {
+  pointer-events: none;
+  user-select: none;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  fill: var(--canvas-text);
+}
+
+.edge--selected path {
+  filter: drop-shadow(0 0 4px rgba(225, 112, 85, 0.5));
+}
+
+.selection-glow {
+  animation: pulse-glow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-glow {
+  from { opacity: 0.2; }
+  to { opacity: 0.5; }
+}
+
+/* ── InspectOverlay ──────────────────────────────────────────── */
+.inspect-overlay {
+  position: fixed;
+  z-index: 2000;
+  pointer-events: none;
+  width: 280px;
+  max-height: 420px;
+  overflow: hidden;
+}
+
+.inspect-overlay-inner {
+  background: var(--surface, #fff);
+  border: 1.5px solid var(--accent, #0984E3);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
+  overflow-y: auto;
+  max-height: 420px;
+  padding: 0 0 8px;
+  font-size: 12px;
+  color: var(--text, #2D3436);
+}
+
+.inspect-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border, #DFE6E9);
+}
+
+.inspect-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text, #2D3436);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspect-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: var(--accent, #0984E3);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.inspect-kind-badge[data-kind="relationship"] { background: #6C5CE7; }
+.inspect-kind-badge[data-kind="note"]         { background: #F9A825; color: #333; }
+.inspect-kind-badge[data-kind="boundary"]     { background: #1565C0; }
+
+.inspect-section-title {
+  padding: 6px 12px 2px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #636E72);
+  margin-top: 4px;
+}
+
+.inspect-row {
+  display: flex;
+  gap: 6px;
+  padding: 2px 12px;
+  align-items: baseline;
+  line-height: 1.5;
+}
+
+.inspect-row-label {
+  min-width: 72px;
+  font-size: 11px;
+  color: var(--text-secondary, #636E72);
+  flex-shrink: 0;
+}
+
+.inspect-row-value {
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text, #2D3436);
+}
+
+.inspect-code {
+  font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+  font-size: 10px;
+  background: var(--surface-alt, #F5F6FA);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+.inspect-desc {
+  margin: 2px 12px 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary, #636E72);
+}
+
+.inspect-list {
+  margin: 2px 12px 4px 22px;
+  padding: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text, #2D3436);
+}
+
+.inspect-rel-type {
+  font-weight: 600;
+  color: var(--accent, #0984E3);
+}
+
+.inspect-rel-arrow {
+  color: var(--text-secondary, #636E72);
+}
+
+.inspect-more {
+  color: var(--text-secondary, #636E72);
+  font-style: italic;
+}
+
+.inspect-kind-mini {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--surface-alt, #F5F6FA);
+  border-radius: 3px;
+  padding: 0 3px;
+  color: var(--text-secondary, #636E72);
+  margin-right: 2px;
+}
+
+/* ── CANVAS CONTEXT MENU ────────────────────────────────────── */
+
+.ctx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.canvas-context-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px 0;
+  min-width: 180px;
+  font-size: 12px;
+  animation: ctx-fade-in 0.12s ease-out;
+}
+
+@keyframes ctx-fade-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text);
+  transition: background var(--transition);
+}
+
+.ctx-item:hover {
+  background: var(--accent-bg);
+}
+
+.ctx-item--danger {
+  color: var(--danger);
+}
+
+.ctx-item--danger:hover {
+  background: var(--danger-bg);
+}
+
+.ctx-item svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.ctx-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 8px;
+}
+
+.ctx-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  padding: 4px 12px 2px;
+}
+
+/* ── CONTEXT CONTROL BAR ───────────────────────────────────── */
+.context-control-bar {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+  gap: 16px;
+}
+
+.ccb-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ccb-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Segmented control base */
+.ccb-segmented {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  background: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.ccb-seg-btn {
+  padding: 2px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  height: 24px;
+  border: none;
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  white-space: nowrap;
+}
+.ccb-seg-btn:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+/* Active zoom button */
+.ccb-seg-btn--active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Viewpoint buttons */
+.ccb-seg-btn--vp-active {
+  background: var(--vp-color, var(--accent));
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Push context label to far right */
+.ccb-context-label {
+  margin-left: auto;
+}
+
+.ccb-context-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--vp-color, var(--accent)) 12%, transparent);
+  color: var(--vp-color, var(--accent));
+  border: 1px solid color-mix(in srgb, var(--vp-color, var(--accent)) 25%, transparent);
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+/* Global mode context bar */
+.ccb--global {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  border-bottom-color: var(--accent);
+}
+
+.ccb-global-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+/* ── CANVAS EMPTY PROMPT ──────────────────────────────────── */
+.canvas-empty-prompt {
+  text-align: center;
+  padding: 32px 40px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  border: 1.5px dashed var(--border);
+  max-width: 380px;
+}
+
+.canvas-empty-icon {
+  font-size: 32px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  margin-bottom: 8px;
+}
+
+.canvas-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.canvas-empty-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}

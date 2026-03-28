@@ -1,5 +1,6 @@
 import { v4 as uuid } from 'uuid';
-import type { ViewFilters, VisualConfig, ThemeMode } from '../../domain/types';
+import type { ViewFilters, VisualConfig, ThemeMode, NodePosition } from '../../domain/types';
+import { NODE_DIMENSIONS } from '../../domain/types';
 import { computeLayout } from '../../layout/layoutEngine';
 import type { StoreSet, StoreGet, LogEntry } from '../storeTypes';
 import { DEFAULT_VISUAL_CONFIG } from '../storeTypes';
@@ -28,6 +29,17 @@ export const createUiSlice = (set: StoreSet, get: StoreGet) => ({
   logEntries: [] as LogEntry[],
   manualLayout: false,
   uiMode: 'normal' as 'normal' | 'distraction-free' | 'presentation',
+
+  // ── Autosave settings ──────────────────────────────────
+  autosaveEnabled: true,
+  autosaveInterval: 30,          // seconds
+
+  // ── Canvas panel visibility ────────────────────────────
+  showMinimap: true,
+  showValidationPanel: true,
+  showViewsPanel: true,
+  inspectMode: false,
+  expandedEntityIds: new Set<string>(),
 
   selectedNoteId: null as string | null,
   selectedBoundaryId: null as string | null,
@@ -138,13 +150,86 @@ export const createUiSlice = (set: StoreSet, get: StoreGet) => ({
     const layoutEntities = visible.filter((e) => !childParentIds.has(e.id));
 
     const lockedOnly = s.positions.filter((p) => p.locked);
-    const result = computeLayout(layoutEntities, lockedOnly, s.visualConfig.nodeDisplayMode, visibleRels, s.viewpoint, s.zoomLevel);
+    const result = computeLayout(layoutEntities, lockedOnly, s.visualConfig.nodeDisplayMode, visibleRels, s.activeViewpoints, s.activeZoomLevels);
     const newIds = new Set(result.positions.map((p) => p.entityId));
     const kept = s.positions.filter((p) => !newIds.has(p.entityId) && p.locked);
-    set({ positions: [...kept, ...result.positions], scale: 1, panX: 0, panY: 0, manualLayout: false });
+    set({ positions: [...kept, ...result.positions], scale: 1, panX: 0, panY: 0, manualLayout: false, expandedEntityIds: new Set<string>() });
     get().addLogEntry('debug', `Auto-layout applied to ${layoutEntities.length} entities`);
   },
 
   setManualLayout: (manual: boolean) => set({ manualLayout: manual }),
   setUiMode: (mode: 'normal' | 'distraction-free' | 'presentation') => set({ uiMode: mode }),
+
+  // ── Autosave settings ──────────────────────────────────────
+  setAutosaveEnabled: (enabled: boolean) => set({ autosaveEnabled: enabled }),
+  setAutosaveInterval: (seconds: number) => set({ autosaveInterval: Math.max(5, Math.min(300, seconds)) }),
+  setZoomSensitivity:  (v: number)       => set({ zoomSensitivity: Math.max(0.01, Math.min(0.30, v)) }),
+
+  // ── Canvas panel visibility ────────────────────────────────
+  toggleShowMinimap:          () => set((s) => ({ showMinimap: !s.showMinimap })),
+  toggleShowValidationPanel:  () => set((s) => ({ showValidationPanel: !s.showValidationPanel })),
+  toggleShowViewsPanel:       () => set((s) => ({ showViewsPanel: !s.showViewsPanel })),
+  toggleInspectMode:          () => set((s) => ({ inspectMode: !s.inspectMode })),
+
+  // ── Expand in place ────────────────────────────────────────
+  collapseAllEntities: () => set({ expandedEntityIds: new Set<string>() }),
+
+  toggleExpandEntity: (id: string) => {
+    const s = get();
+
+    // Only available in the normal (non-drilled) canvas view
+    if (s.focusEntityId) return;
+
+    const hasChildren = s.entities.some((e) => e.parentId === id);
+    if (!hasChildren) return;
+
+    const next = new Set(s.expandedEntityIds);
+    if (next.has(id)) {
+      // COLLAPSE: remove this entity and all its descendants
+      next.delete(id);
+      const queue = [id];
+      while (queue.length) {
+        const curr = queue.shift()!;
+        for (const child of s.entities.filter((e) => e.parentId === curr)) {
+          next.delete(child.id);
+          queue.push(child.id);
+        }
+      }
+      set({ expandedEntityIds: next });
+    } else {
+      // EXPAND: add to set, pre-position children near their parent
+      next.add(id);
+      const parentPos = s.positions.find((p) => p.entityId === id);
+      const children = s.entities.filter((e) => e.parentId === id);
+      const posMap = new Map(s.positions.map((p) => [p.entityId, p]));
+      const newPositions: NodePosition[] = [...s.positions];
+
+      if (parentPos && children.length > 0) {
+        const COLS = Math.min(3, children.length);
+        const COL_GAP = 40;
+        const ROW_GAP = 40;
+        let unpositioned = children.filter((c) => !posMap.has(c.id));
+        let col = 0, row = 0;
+        // Estimate column width from first child's kind dimensions
+        const firstDims = NODE_DIMENSIONS[unpositioned[0]?.kind ?? 'container'] ?? { width: 160, height: 80 };
+        const colW = firstDims.width + COL_GAP;
+        const rowH = firstDims.height + ROW_GAP;
+        const gridOffsetX = parentPos.x + 40;
+        const gridOffsetY = parentPos.y + 80;
+
+        for (const child of unpositioned) {
+          newPositions.push({
+            entityId: child.id,
+            x: gridOffsetX + col * colW,
+            y: gridOffsetY + row * rowH,
+            locked: false,
+          } as NodePosition);
+          col++;
+          if (col >= COLS) { col = 0; row++; }
+        }
+      }
+
+      set({ expandedEntityIds: next, manualLayout: true, positions: newPositions });
+    }
+  },
 });

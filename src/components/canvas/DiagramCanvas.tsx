@@ -12,6 +12,8 @@ import { getValidKindsForViewpoint } from '../../utils/validation';
 import { CanvasContextMenu } from './CanvasContextMenu';
 import type { ContextMenuTarget } from './CanvasContextMenu';
 import { CanvasLegend } from './CanvasLegend';
+import { InspectOverlay } from './InspectOverlay';
+import type { InspectTarget } from './InspectOverlay';
 
 const ZOOM_TITLES: Record<string, string> = {
   context: 'System Context',
@@ -56,6 +58,11 @@ export const DiagramCanvas: React.FC = () => {
 
   const [rubberBand, setRubberBand] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
 
+  // ── Inspect mode ─────────────────────────────────────────────
+  const inspectMode = useStore((s) => s.inspectMode);
+  const [inspectTarget, setInspectTarget] = useState<InspectTarget | null>(null);
+  const [inspectMouse, setInspectMouse] = useState({ x: 0, y: 0 });
+
   const entities = useStore((s) => s.entities);
   const relationships = useStore((s) => s.relationships);
   const positions = useStore((s) => s.positions);
@@ -76,6 +83,7 @@ export const DiagramCanvas: React.FC = () => {
   const setShowRelationshipForm = useStore((s) => s.setShowRelationshipForm);
   const openNewRelationship = useStore((s) => s.openNewRelationship);
   const drillDown = useStore((s) => s.drillDown);
+  const toggleExpandEntity = useStore((s) => s.toggleExpandEntity);
   const setZoomLevel = useStore((s) => s.setZoomLevel);
   const setViewpoint = useStore((s) => s.setViewpoint);
   const setPosition = useStore((s) => s.setPosition);
@@ -90,6 +98,8 @@ export const DiagramCanvas: React.FC = () => {
   const zoomLevel = useStore((s) => s.zoomLevel);
   const viewpoint = useStore((s) => s.viewpoint);
   const focusEntityId = useStore((s) => s.focusEntityId);
+  const activeViewpoints = useStore((s) => s.activeViewpoints);
+  const activeZoomLevels = useStore((s) => s.activeZoomLevels);
 
   const notes = useStore((s) => s.notes);
   const boundaries = useStore((s) => s.boundaries);
@@ -124,24 +134,6 @@ export const DiagramCanvas: React.FC = () => {
   useEffect(() => {
     if (visibleEntities.length === 0) return;
 
-    // Global viewpoint uses its own layout engine
-    if (viewpoint === 'global') {
-      // Exclude parent-frame entities from layout
-      const childParentIds = new Set<string>();
-      for (const e of visibleEntities) {
-        if (e.parentId && visibleEntities.some((p) => p.id === e.parentId)) {
-          childParentIds.add(e.parentId);
-        }
-      }
-      const layoutEntities = visibleEntities.filter((e) => !childParentIds.has(e.id));
-      const result = computeGlobalLayout(layoutEntities, positions, visualConfig.nodeDisplayMode);
-      globalLayoutRef.current = result;
-      for (const pos of result.positions) {
-        setPosition(pos.entityId, pos.x, pos.y);
-      }
-      return;
-    }
-
     globalLayoutRef.current = null;
 
     if (!manualLayout) {
@@ -162,14 +154,14 @@ export const DiagramCanvas: React.FC = () => {
         }
       }
       const layoutEntities = visibleEntities.filter((e) => !childParentIds.has(e.id));
-      const result = computeLayout(layoutEntities, positions, visualConfig.nodeDisplayMode, visibleRelationships, viewpoint, zoomLevel);
+      const result = computeLayout(layoutEntities, positions, visualConfig.nodeDisplayMode, visibleRelationships, activeViewpoints, activeZoomLevels);
       for (const pos of result.positions) {
         if (!posMap.has(pos.entityId)) {
           setPosition(pos.entityId, pos.x, pos.y);
         }
       }
     }
-  }, [visibleEntities.map((e) => e.id).join(','), visibleRelationships.map((r) => r.id).join(','), manualLayout, viewpoint]);
+  }, [visibleEntities.map((e) => e.id).join(','), visibleRelationships.map((r) => r.id).join(','), manualLayout, activeViewpoints.join(','), activeZoomLevels.join(',')]);
 
   // Space key: activates pan-override mode (Space + drag)
   useEffect(() => {
@@ -448,7 +440,75 @@ export const DiagramCanvas: React.FC = () => {
       const newY = snapVal(e.clientY / scale - draggingBoundary.offsetY - panY / scale);
       updateBoundary(draggingBoundary.boundaryId, { x: newX, y: newY });
     }
-  }, [rubberBand, resizing, connecting, dragging, draggingNote, draggingBoundary, scale, panX, panY, snap, visibleEntities, posMap, visualConfig.nodeDisplayMode]);
+
+    // ── Inspect mode hit-testing ───────────────────────────────
+    if (inspectMode) {
+      setInspectMouse({ x: e.clientX, y: e.clientY });
+
+      const svgRect = svgRef.current?.getBoundingClientRect();
+      if (svgRect) {
+        const wx = (e.clientX - svgRect.left - panX) / scale;
+        const wy = (e.clientY - svgRect.top - panY) / scale;
+        const DIMS_MAP = visualConfig.nodeDisplayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
+
+        // 1. Check entities
+        let found: InspectTarget | null = null;
+        for (const entity of visibleEntities) {
+          const pos = posMap.get(entity.id);
+          if (!pos) continue;
+          const d = DIMS_MAP[entity.kind];
+          if (wx >= pos.x && wx <= pos.x + d.width && wy >= pos.y && wy <= pos.y + d.height) {
+            const rels = relationships.filter((r) => r.sourceId === entity.id || r.targetId === entity.id);
+            found = { kind: 'entity', entity, position: pos, relationships: rels };
+            break;
+          }
+        }
+
+        // 2. Check notes
+        if (!found) {
+          for (const note of notes) {
+            if (wx >= note.x && wx <= note.x + note.width && wy >= note.y && wy <= note.y + note.height) {
+              found = { kind: 'note', note };
+              break;
+            }
+          }
+        }
+
+        // 3. Check boundaries
+        if (!found) {
+          for (const boundary of boundaries) {
+            if (wx >= boundary.x && wx <= boundary.x + boundary.width && wy >= boundary.y && wy <= boundary.y + boundary.height) {
+              found = { kind: 'boundary', boundary };
+              break;
+            }
+          }
+        }
+
+        // 4. Check relationships (proximity to midpoint)
+        if (!found) {
+          const HIT_RADIUS = 12;
+          for (const rel of visibleRelationships) {
+            const sPos = posMap.get(rel.sourceId);
+            const tPos = posMap.get(rel.targetId);
+            const sEnt = entityMap.get(rel.sourceId);
+            const tEnt = entityMap.get(rel.targetId);
+            if (!sPos || !tPos || !sEnt || !tEnt) continue;
+            const sd = DIMS_MAP[sEnt.kind];
+            const td = DIMS_MAP[tEnt.kind];
+            const midX = (sPos.x + sd.width / 2 + tPos.x + td.width / 2) / 2;
+            const midY = (sPos.y + sd.height / 2 + tPos.y + td.height / 2) / 2;
+            const dist = Math.sqrt((wx - midX) ** 2 + (wy - midY) ** 2);
+            if (dist <= HIT_RADIUS) {
+              found = { kind: 'relationship', rel, source: sEnt, target: tEnt };
+              break;
+            }
+          }
+        }
+
+        setInspectTarget(found);
+      }
+    }
+  }, [rubberBand, resizing, connecting, dragging, draggingNote, draggingBoundary, scale, panX, panY, snap, visibleEntities, posMap, visualConfig.nodeDisplayMode, inspectMode, notes, boundaries, visibleRelationships, relationships, entityMap]);
 
   const handleMouseUp = useCallback(() => {
     if (rubberBand) {
@@ -534,7 +594,8 @@ export const DiagramCanvas: React.FC = () => {
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.08 : 0.08;
+    const sensitivity = useStore.getState().zoomSensitivity ?? 0.08;
+    const delta = e.deltaY > 0 ? -sensitivity : sensitivity;
     useStore.getState().setScale(useStore.getState().scale + delta);
   }, []);
 
@@ -614,10 +675,10 @@ export const DiagramCanvas: React.FC = () => {
 
   // C4 diagram title
   const focusEntity = focusEntityId ? entities.find((e) => e.id === focusEntityId) : null;
-  const isGlobalView = viewpoint === 'global';
-  const diagramTitle = isGlobalView
-    ? `Global View — All Viewpoints and Levels`
-    : `${VIEWPOINT_LABELS[viewpoint]} · ${ZOOM_TITLES[zoomLevel]} diagram for ${focusEntity?.name ?? projectName}`;
+  const isGlobalView = false;
+  const diagramTitle = focusEntityId
+    ? `${VIEWPOINT_LABELS[viewpoint]} · ${ZOOM_TITLES[zoomLevel]} — ${focusEntity?.name ?? projectName}`
+    : `${activeViewpoints.map((vp) => VIEWPOINT_LABELS[vp]).join(' + ')} · ${activeZoomLevels.map((zl) => ZOOM_TITLES[zl] ?? zl).join(' + ')}`;
 
   // Global layout swim-lane/row metadata
   const globalLanes = globalLayoutRef.current?.vpLanes ?? [];
@@ -756,7 +817,7 @@ export const DiagramCanvas: React.FC = () => {
       onDrop={handleDrop}
       style={{
         background: 'var(--canvas-bg, #FAFBFC)',
-        cursor: connecting ? 'crosshair' : panning ? 'grabbing' : resizing ? HANDLE_CURSOR[resizing.handle] : spaceDown ? 'grab' : 'default',
+        cursor: connecting ? 'crosshair' : panning ? 'grabbing' : resizing ? HANDLE_CURSOR[resizing.handle] : spaceDown ? 'grab' : inspectMode ? 'crosshair' : 'default',
       }}
       role="application"
       aria-label="Architecture diagram canvas. Drag to pan, scroll to zoom, middle-click or Space+drag to pan freely."
@@ -1034,7 +1095,7 @@ export const DiagramCanvas: React.FC = () => {
                     selectEntity(id);
                   }
                 }}
-                onDrillDown={drillDown}
+                onDrillDown={toggleExpandEntity}
                 onDragStart={handleDragStart}
                 onConnectStart={isReadOnly ? undefined : handleConnectStart}
                 connectTarget={!isReadOnly && connecting !== null && connecting.overEntityId === entity.id}
@@ -1246,6 +1307,15 @@ export const DiagramCanvas: React.FC = () => {
         y={contextMenu.y}
         onClose={() => setContextMenu(null)}
         snapVal={snapVal}
+      />
+    )}
+
+    {/* Inspect overlay */}
+    {inspectMode && (
+      <InspectOverlay
+        target={inspectTarget}
+        mouseX={inspectMouse.x}
+        mouseY={inspectMouse.y}
       />
     )}
     </>

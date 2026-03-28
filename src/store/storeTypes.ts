@@ -106,6 +106,11 @@ export interface ArchLensState {
 
   setZoomLevel: (level: ZoomLevel) => void;
   setViewpoint: (vp: Viewpoint) => void;
+  // ── Multi-select view filters ─────────────────────────────────────────────
+  activeZoomLevels: ZoomLevel[];
+  activeViewpoints: Viewpoint[];
+  toggleActiveZoomLevel: (level: ZoomLevel) => void;
+  toggleActiveViewpoint: (vp: Viewpoint) => void;
   setFocusEntity: (id: string | null) => void;
   setDiagramMode: (mode: DiagramMode) => void;
   drillDown: (entityId: string) => void;
@@ -192,6 +197,29 @@ export interface ArchLensState {
   getVisibleEntities: () => ArchEntity[];
   getVisibleRelationships: () => Relationship[];
   getChildrenOf: (parentId: string) => ArchEntity[];
+
+  // ── Autosave settings ──────────────────────────────────────
+  autosaveEnabled: boolean;
+  autosaveInterval: number;   // seconds
+  setAutosaveEnabled: (enabled: boolean) => void;
+  setAutosaveInterval: (seconds: number) => void;
+  // ── Canvas zoom sensitivity ──────────────────────────────────────────────────
+  zoomSensitivity: number;    // 0.01 – 0.30, default 0.08
+  setZoomSensitivity: (v: number) => void;
+  // ── Canvas panel visibility ────────────────────────────────
+  showMinimap: boolean;
+  showValidationPanel: boolean;
+  showViewsPanel: boolean;
+  toggleShowMinimap: () => void;
+  toggleShowValidationPanel: () => void;
+  toggleShowViewsPanel: () => void;
+  // ── Inspect mode ──────────────────────────────────────────
+  inspectMode: boolean;
+  toggleInspectMode: () => void;
+  // ── Expand in place ───────────────────────────────────────
+  expandedEntityIds: Set<string>;
+  toggleExpandEntity: (id: string) => void;
+  collapseAllEntities: () => void;
 }
 
 // ─── SLICE HELPER TYPES ──────────────────────────────────────────

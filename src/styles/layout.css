@@ -1,0 +1,265 @@
+/* ═══════════════════════════════════════════════════════════════
+   Layout — App shell, activity bar, resize handles, sidebars
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── APP LAYOUT ────────────────────────────────────────────── */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── ACTIVITY BAR (VS Code-style side toggles) ────────────── */
+
+.activity-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 40px;
+  min-width: 40px;
+  background: var(--surface-alt);
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+  z-index: 5;
+}
+
+.activity-bar--left {
+  border-right: 1px solid var(--border);
+  border-left: none;
+}
+
+.activity-bar--right {
+  border-left: 1px solid var(--border);
+  border-right: none;
+}
+
+.activity-bar-top,
+.activity-bar-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.activity-bar-top {
+  padding-top: 4px;
+}
+
+.activity-bar-bottom {
+  padding-bottom: 6px;
+}
+
+.activity-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  position: relative;
+  transition: color var(--transition), background var(--transition);
+}
+
+.activity-bar-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-alt);
+}
+
+.activity-bar-btn--active {
+  color: var(--text);
+}
+
+.activity-bar--left .activity-bar-btn--active::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+
+.activity-bar--right .activity-bar-btn--active::before {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 2px 0 0 2px;
+  background: var(--accent);
+}
+
+.activity-bar-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.canvas-and-log {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.canvas-area {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.canvas-footer {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.canvas-footer > * {
+  pointer-events: auto;
+}
+
+.canvas-footer-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+/* ── RESIZE HANDLES ────────────────────────────────────────── */
+
+.resize-handle {
+  flex-shrink: 0;
+  background: transparent;
+  position: relative;
+  z-index: 20;
+  transition: background var(--transition);
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  border-radius: 2px;
+  background: var(--border);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.resize-handle:hover::after,
+.resize-handle:active::after {
+  opacity: 1;
+}
+
+.resize-handle:active {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.resize-handle--horizontal {
+  width: 5px;
+  cursor: col-resize;
+}
+
+.resize-handle--horizontal::after {
+  top: 50%;
+  left: 1px;
+  width: 3px;
+  height: 32px;
+  transform: translateY(-50%);
+}
+
+.resize-handle--vertical {
+  height: 5px;
+  cursor: row-resize;
+}
+
+.resize-handle--vertical::after {
+  left: 50%;
+  top: 1px;
+  height: 3px;
+  width: 32px;
+  transform: translateX(-50%);
+}
+
+/* ── LEFT SIDEBAR (shape palette) ───────────────────────────── */
+.left-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+/* ── RIGHT SIDEBAR (stacked collapsible panels) ─────────────── */
+.right-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+}
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-section--collapsed {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+}
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--surface-alt);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+  text-align: left;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  transition: background var(--transition);
+}
+
+.sidebar-section-header:hover {
+  background: var(--surface);
+}
+
+.sidebar-section-title {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+}

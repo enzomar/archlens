@@ -8,7 +8,9 @@ import {
   ALL_DEPLOYMENT_STAGES, ALL_EDGE_TYPES, FIELD_HELP, CONCRETE_VIEWPOINTS, ALL_ZOOM_LEVELS,
 } from '../../domain/types';
 import { getValidKindsForViewpoint } from '../../utils/validation';
-import { X, HelpCircle, Plus, Trash2, Copy } from 'lucide-react';
+import { X, HelpCircle, Plus, Trash2, Copy, Sparkles } from 'lucide-react';
+import { PlacementModal } from './PlacementModal';
+import type { PlacementResult } from './PlacementModal';
 
 // ─── Field label with ? help popover ──────────────────────────────
 
@@ -104,9 +106,6 @@ export const EntityForm: React.FC = () => {
   const [pciDss, setPciDss] = useState(false);
   const [adrUrl, setAdrUrl] = useState('');
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'identity' | 'classification' | 'compliance' | 'relationships'>('identity');
-
   // Relationship inline editing state
   interface RelDraft { direction: 'outgoing' | 'incoming'; targetId: string; type: EdgeType; label: string; protocol: string; description: string; existingId?: string; }
   const [relDrafts, setRelDrafts] = useState<RelDraft[]>([]);
@@ -121,6 +120,29 @@ export const EntityForm: React.FC = () => {
 
   const [errors, setErrors] = useState<string[]>([]);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // ── Placement wizard ─────────────────────────────────────────
+  const [showWizard, setShowWizard] = useState(false);
+
+  // ── Active tab ───────────────────────────────────────────────
+  type Tab = 'identity' | 'details' | 'relationships';
+  const [activeTab, setActiveTab] = useState<Tab>('identity');
+
+  // Auto-open wizard for new entities (not editing)
+  useEffect(() => {
+    if (showForm && !editingId) {
+      setShowWizard(true);
+    } else {
+      setShowWizard(false);
+    }
+  }, [showForm, editingId]);
+
+  const handleWizardConfirm = (result: PlacementResult) => {
+    setFormViewpoint(result.viewpoint as Viewpoint);
+    setFormZoomLevel(result.zoomLevel as ZoomLevel);
+    setKind(result.kind);
+    setShowWizard(false);
+  };
 
   // Focus trap + Escape handler
   useEffect(() => {
@@ -203,10 +225,11 @@ export const EntityForm: React.FC = () => {
     setMaturity(''); setSize(''); setAppType(''); setDeploymentStage('');
     setTechConvergency(0); setTechnology(''); setOwner(''); setNotes('');
     setTps(''); setCompute(''); setCodeRepository('');
-    setPii(false); setPciDss(false); setErrors([]);
+    setPii(false); setPciDss(false); setAdrUrl(''); setErrors([]);
     setFormViewpoint(storeViewpoint); setFormZoomLevel(zoomLevel);
     setRelDrafts([]); setDeletedRelIds([]);
     setShowAddRel(false); resetNewRel();
+    setActiveTab('identity');
   }
 
   function validate(): boolean {
@@ -237,6 +260,7 @@ export const EntityForm: React.FC = () => {
       ...(codeRepository && { codeRepository }),
       ...(pii && { pii }),
       ...(pciDss && { pciDss }),
+      ...(adrUrl && { adrUrl }),
     };
 
     const entityData = {
@@ -368,6 +392,13 @@ export const EntityForm: React.FC = () => {
   const showRelationships = kind !== 'artifact';
 
   return (
+    <>
+    {showWizard && (
+      <PlacementModal
+        onConfirm={handleWizardConfirm}
+        onSkip={() => setShowWizard(false)}
+      />
+    )}
     <div className="modal-overlay" onClick={() => setShowEntityForm(false)} role="presentation">
       <div
         className="modal-content entity-form"
@@ -379,7 +410,20 @@ export const EntityForm: React.FC = () => {
       >
         <div className="modal-header">
           <h2 id="entity-form-title">{editing ? 'Edit Entity' : 'Create Entity'}</h2>
-          <button className="btn-icon" onClick={() => setShowEntityForm(false)} aria-label="Close"><X size={18} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {!editing && (
+              <button
+                type="button"
+                className="btn-icon pm-trigger-btn"
+                onClick={() => setShowWizard(true)}
+                title="Open placement guide"
+                aria-label="Open placement guide"
+              >
+                <Sparkles size={15} />
+              </button>
+            )}
+            <button className="btn-icon" onClick={() => setShowEntityForm(false)} aria-label="Close"><X size={18} /></button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -406,344 +450,390 @@ export const EntityForm: React.FC = () => {
             </div>
           )}
 
-          {/* ── Kind + Name + Short Name ─────────────────── */}
-          <div className="form-row">
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-kind" required helpKey="kind">Kind</FieldLabel>
-              <select id="entity-kind" value={kind} onChange={(e) => setKind(e.target.value as EntityKind)}>
-                {allowedKinds.map((k) => <option key={k} value={k}>{k}</option>)}
-                {/* If editing an entity whose kind is no longer in context, keep it visible */}
-                {editing && !allowedKinds.includes(editing.kind) && (
-                  <option key={editing.kind} value={editing.kind}>{editing.kind} (current)</option>
-                )}
-              </select>
-            </div>
-            <div className="form-group flex-2">
-              <FieldLabel htmlFor="entity-name" required helpKey="name">Name</FieldLabel>
-              <input id="entity-name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full entity name" />
-            </div>
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-shortname" required helpKey="shortName">Short Name</FieldLabel>
-              <input id="entity-shortname" type="text" value={shortName} onChange={(e) => setShortName(e.target.value)} placeholder="e.g. OrdSvc" maxLength={12} />
-            </div>
+          {/* ══ Tab Bar ════════════════════════════════════ */}
+          <div className="ef-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'identity'}
+              className={`ef-tab-btn${activeTab === 'identity' ? ' active' : ''}`}
+              onClick={() => setActiveTab('identity')}
+            >
+              Identity
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'details'}
+              className={`ef-tab-btn${activeTab === 'details' ? ' active' : ''}`}
+              onClick={() => setActiveTab('details')}
+            >
+              Details
+            </button>
+            {showRelationships && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'relationships'}
+                className={`ef-tab-btn${activeTab === 'relationships' ? ' active' : ''}`}
+                onClick={() => setActiveTab('relationships')}
+              >
+                Relationships
+                {relDrafts.length > 0 && <span className="ef-tab-badge">{relDrafts.length}</span>}
+              </button>
+            )}
           </div>
 
-          {/* ── Viewpoint + C4 Zoom Level ────────────────── */}
-          <div className="form-row">
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-viewpoint" helpKey="viewpoint">Viewpoint</FieldLabel>
-              <select id="entity-viewpoint" value={formViewpoint} onChange={(e) => setFormViewpoint(e.target.value as Viewpoint)}>
-                {CONCRETE_VIEWPOINTS.map((vp) => (
-                  <option key={vp} value={vp}>{vp.charAt(0).toUpperCase() + vp.slice(1)}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-zoom" helpKey="zoomLevel">C4 Zoom Level</FieldLabel>
-              <select id="entity-zoom" value={formZoomLevel} onChange={(e) => setFormZoomLevel(e.target.value as ZoomLevel)}>
-                {ALL_ZOOM_LEVELS.map((z) => (
-                  <option key={z} value={z}>{z.charAt(0).toUpperCase() + z.slice(1)}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          {/* ══ Identity tab ════════════════════════════════ */}
+          {activeTab === 'identity' && (
+            <div className="ef-tab-panel" role="tabpanel">
 
-          {/* ── Identification ID + Parent Name ──────────── */}
-          <div className="form-row">
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-identid" helpKey="identificationId">Identification ID</FieldLabel>
-              <input id="entity-identid" type="text" value={identificationId} onChange={(e) => setIdentificationId(e.target.value)} placeholder="e.g. SYS-001" />
-            </div>
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-parentname" helpKey="parentName">Parent Name</FieldLabel>
-              <input id="entity-parentname" type="text" value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="e.g. Finance Domain" />
-            </div>
-          </div>
+              {/* Kind + Name + Short Name */}
+              <div className="form-row">
+                <div className="form-group">
+                  <FieldLabel htmlFor="entity-kind" required helpKey="kind">Kind</FieldLabel>
+                  <select id="entity-kind" value={kind} onChange={(e) => setKind(e.target.value as EntityKind)}>
+                    {allowedKinds.map((k) => <option key={k} value={k}>{k}</option>)}
+                    {editing && !allowedKinds.includes(editing.kind) && (
+                      <option key={editing.kind} value={editing.kind}>{editing.kind} (current)</option>
+                    )}
+                  </select>
+                </div>
+                <div className="form-group flex-2">
+                  <FieldLabel htmlFor="entity-name" required helpKey="name">Name</FieldLabel>
+                  <input id="entity-name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full entity name" />
+                </div>
+                <div className="form-group">
+                  <FieldLabel htmlFor="entity-shortname" required helpKey="shortName">Short Name</FieldLabel>
+                  <input id="entity-shortname" type="text" value={shortName} onChange={(e) => setShortName(e.target.value)} placeholder="e.g. OrdSvc" maxLength={12} />
+                </div>
+              </div>
 
-          {/* ── Description (optional) ───────────────────── */}
-          <div className="form-group">
-            <FieldLabel htmlFor="entity-desc" helpKey="description">Description</FieldLabel>
-            <textarea id="entity-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What does this entity do?" />
-          </div>
+              {/* Viewpoint + C4 Zoom Level */}
+              <div className="form-row">
+                <div className="form-group">
+                  <FieldLabel htmlFor="entity-viewpoint" helpKey="viewpoint">Viewpoint</FieldLabel>
+                  <select id="entity-viewpoint" value={formViewpoint} onChange={(e) => setFormViewpoint(e.target.value as Viewpoint)}>
+                    {CONCRETE_VIEWPOINTS.map((vp) => (
+                      <option key={vp} value={vp}>{vp.charAt(0).toUpperCase() + vp.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <FieldLabel htmlFor="entity-zoom" helpKey="zoomLevel">C4 Zoom Level</FieldLabel>
+                  <select id="entity-zoom" value={formZoomLevel} onChange={(e) => setFormZoomLevel(e.target.value as ZoomLevel)}>
+                    {ALL_ZOOM_LEVELS.map((z) => (
+                      <option key={z} value={z}>{z.charAt(0).toUpperCase() + z.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-          {/* ── Responsibilities list ────────────────────── */}
-          {showResponsibilities && (
-          <div className="form-group">
-            <FieldLabel helpKey="responsibilities">Responsibilities</FieldLabel>
-            {responsibilities.length > 0 && (
-              <ul className="responsibilities-list">
-                {responsibilities.map((r, i) => (
-                  <li key={i} className="responsibility-item">
-                    <span>{r}</span>
-                    <button type="button" className="btn-icon btn-danger-icon" onClick={() => removeResponsibility(i)} aria-label="Remove responsibility">
-                      <Trash2 size={12} />
+              {/* Identification ID + Parent Name */}
+              <div className="form-row">
+                <div className="form-group">
+                  <FieldLabel htmlFor="entity-identid" helpKey="identificationId">Identification ID</FieldLabel>
+                  <input id="entity-identid" type="text" value={identificationId} onChange={(e) => setIdentificationId(e.target.value)} placeholder="e.g. SYS-001" />
+                </div>
+                <div className="form-group">
+                  <FieldLabel htmlFor="entity-parentname" helpKey="parentName">Parent Name</FieldLabel>
+                  <input id="entity-parentname" type="text" value={parentName} onChange={(e) => setParentName(e.target.value)} placeholder="e.g. Finance Domain" />
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="form-group">
+                <FieldLabel htmlFor="entity-desc" helpKey="description">Description</FieldLabel>
+                <textarea id="entity-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What does this entity do?" />
+              </div>
+
+              {/* Parent (structural) */}
+              {showParent && (
+                <div className="form-group">
+                  <FieldLabel htmlFor="entity-parent" required={kind === 'component'} helpKey="parent">Parent</FieldLabel>
+                  <select id="entity-parent" value={parentId} onChange={(e) => setParentId(e.target.value)}>
+                    <option value="">— None —</option>
+                    {potentialParents.map((p) => <option key={p.id} value={p.id}>{p.name} [{p.kind}]</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Responsibilities */}
+              {showResponsibilities && (
+                <div className="form-group">
+                  <FieldLabel helpKey="responsibilities">Responsibilities</FieldLabel>
+                  {responsibilities.length > 0 && (
+                    <ul className="responsibilities-list">
+                      {responsibilities.map((r, i) => (
+                        <li key={i} className="responsibility-item">
+                          <span>{r}</span>
+                          <button type="button" className="btn-icon btn-danger-icon" onClick={() => removeResponsibility(i)} aria-label="Remove responsibility">
+                            <Trash2 size={12} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="responsibility-add">
+                    <input
+                      type="text"
+                      value={newResponsibility}
+                      onChange={(e) => setNewResponsibility(e.target.value)}
+                      placeholder="Add a responsibility..."
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addResponsibility(); } }}
+                    />
+                    <button type="button" className="btn btn-sm" onClick={addResponsibility} disabled={!newResponsibility.trim()}>
+                      <Plus size={14} />
                     </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="responsibility-add">
-              <input
-                type="text"
-                value={newResponsibility}
-                onChange={(e) => setNewResponsibility(e.target.value)}
-                placeholder="Add a responsibility..."
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addResponsibility(); } }}
-              />
-              <button type="button" className="btn btn-sm" onClick={addResponsibility} disabled={!newResponsibility.trim()}>
-                <Plus size={14} />
-              </button>
-            </div>
-          </div>
-          )}
+                  </div>
+                </div>
+              )}
 
-          {/* ── Parent (structural) ──────────────────────── */}
-          {showParent && (
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-parent" required={kind === 'component'} helpKey="parent">Parent</FieldLabel>
-              <select id="entity-parent" value={parentId} onChange={(e) => setParentId(e.target.value)}>
-                <option value="">— None —</option>
-                {potentialParents.map((p) => <option key={p.id} value={p.id}>{p.name} [{p.kind}]</option>)}
-              </select>
             </div>
           )}
 
-          {/* ── Maturity, Size, AppType, Deployment ──────── */}
-          {(showMaturitySize || showAppType || showDeployment) && (
-          <div className="form-row">
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-maturity" helpKey="maturity">Maturity</FieldLabel>
-              <select id="entity-maturity" value={maturity} onChange={(e) => setMaturity(e.target.value as Maturity | '')}>
-                <option value="">—</option>
-                {ALL_MATURITIES.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-size" helpKey="size">Size</FieldLabel>
-              <select id="entity-size" value={size} onChange={(e) => setSize(e.target.value as TShirtSize | '')}>
-                <option value="">—</option>
-                {ALL_TSHIRT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            {showAppType && (
+          {/* ══ Details tab ══════════════════════════════════ */}
+          {activeTab === 'details' && (
+            <div className="ef-tab-panel" role="tabpanel">
+
+              {/* Maturity, Size, AppType, Deployment */}
+              {(showMaturitySize || showAppType || showDeployment) && (
+                <div className="form-row">
+                  {showMaturitySize && (
+                    <div className="form-group">
+                      <FieldLabel htmlFor="entity-maturity" helpKey="maturity">Maturity</FieldLabel>
+                      <select id="entity-maturity" value={maturity} onChange={(e) => setMaturity(e.target.value as Maturity | '')}>
+                        <option value="">—</option>
+                        {ALL_MATURITIES.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {showMaturitySize && (
+                    <div className="form-group">
+                      <FieldLabel htmlFor="entity-size" helpKey="size">Size</FieldLabel>
+                      <select id="entity-size" value={size} onChange={(e) => setSize(e.target.value as TShirtSize | '')}>
+                        <option value="">—</option>
+                        {ALL_TSHIRT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {showAppType && (
+                    <div className="form-group">
+                      <FieldLabel htmlFor="entity-apptype" helpKey="appType">App Type</FieldLabel>
+                      <select id="entity-apptype" value={appType} onChange={(e) => setAppType(e.target.value as AppType | '')}>
+                        <option value="">—</option>
+                        {ALL_APP_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {showDeployment && (
+                    <div className="form-group">
+                      <FieldLabel htmlFor="entity-deploy" helpKey="deployment">Deployment</FieldLabel>
+                      <select id="entity-deploy" value={deploymentStage} onChange={(e) => setDeploymentStage(e.target.value as DeploymentStage | '')}>
+                        <option value="">—</option>
+                        {ALL_DEPLOYMENT_STAGES.map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Technology + Tech Convergency */}
+              {showTechFields && (
+                <div className="form-row">
+                  <div className="form-group flex-2">
+                    <FieldLabel htmlFor="entity-tech" helpKey="technology">Technology</FieldLabel>
+                    <input id="entity-tech" type="text" value={technology} onChange={(e) => setTechnology(e.target.value)} placeholder="e.g. Java / Spring Boot" />
+                  </div>
+                  <div className="form-group">
+                    <FieldLabel htmlFor="entity-convergency" helpKey="techConvergency">Tech Convergency</FieldLabel>
+                    <select id="entity-convergency" value={techConvergency} onChange={(e) => setTechConvergency(Number(e.target.value) as TechConvergency | 0)}>
+                      <option value={0}>—</option>
+                      <option value={1}>1 (Low)</option>
+                      <option value={2}>2 (Medium)</option>
+                      <option value={3}>3 (High)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* TPS + Compute */}
+              {showTpsCompute && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <FieldLabel htmlFor="entity-tps" helpKey="tps">TPS</FieldLabel>
+                    <input id="entity-tps" type="number" min={0} value={tps} onChange={(e) => setTps(e.target.value)} placeholder="e.g. 1000" />
+                  </div>
+                  <div className="form-group">
+                    <FieldLabel htmlFor="entity-compute" helpKey="compute">Compute</FieldLabel>
+                    <select id="entity-compute" value={compute} onChange={(e) => setCompute(e.target.value as TShirtSize | '')}>
+                      <option value="">—</option>
+                      {ALL_TSHIRT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* Code Repository */}
+              {showCodeRepo && (
+                <div className="form-group">
+                  <FieldLabel htmlFor="entity-repo" helpKey="codeRepository">Code Repository</FieldLabel>
+                  <input id="entity-repo" type="text" value={codeRepository} onChange={(e) => setCodeRepository(e.target.value)} placeholder="e.g. https://github.com/org/repo" />
+                </div>
+              )}
+
+              {/* PII + PCI-DSS + ADR URL */}
+              {showCompliance && (
+                <div className="form-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="form-group form-checkbox-group" style={{ flexBasis: 'auto', flex: 'none' }}>
+                    <label className="checkbox-label">
+                      <input type="checkbox" checked={pii} onChange={(e) => setPii(e.target.checked)} />
+                      PII
+                    </label>
+                    <button type="button" className="field-help-btn" onClick={() => {}} title={FIELD_HELP.pii} aria-label="Help for PII">
+                      <HelpCircle size={13} />
+                    </button>
+                  </div>
+                  <div className="form-group form-checkbox-group" style={{ flexBasis: 'auto', flex: 'none' }}>
+                    <label className="checkbox-label">
+                      <input type="checkbox" checked={pciDss} onChange={(e) => setPciDss(e.target.checked)} />
+                      PCI-DSS
+                    </label>
+                    <button type="button" className="field-help-btn" onClick={() => {}} title={FIELD_HELP.pciDss} aria-label="Help for PCI-DSS">
+                      <HelpCircle size={13} />
+                    </button>
+                  </div>
+                  <div className="form-group">
+                    <FieldLabel htmlFor="entity-adr" helpKey="adrUrl">ADR URL</FieldLabel>
+                    <input id="entity-adr" type="text" value={adrUrl} onChange={(e) => setAdrUrl(e.target.value)} placeholder="https://adr.example.com/..." />
+                  </div>
+                </div>
+              )}
+
+              {/* Owner */}
+              {showOwner && (
+                <div className="form-group">
+                  <FieldLabel htmlFor="entity-owner" helpKey="owner">Owner</FieldLabel>
+                  <input id="entity-owner" type="text" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Team or person" />
+                </div>
+              )}
+
+              {/* Notes */}
               <div className="form-group">
-                <FieldLabel htmlFor="entity-apptype" helpKey="appType">App Type</FieldLabel>
-                <select id="entity-apptype" value={appType} onChange={(e) => setAppType(e.target.value as AppType | '')}>
-                  <option value="">—</option>
-                  {ALL_APP_TYPES.map((a) => <option key={a} value={a}>{a}</option>)}
-                </select>
+                <FieldLabel htmlFor="entity-notes" helpKey="notes">Notes</FieldLabel>
+                <textarea id="entity-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Additional notes" />
               </div>
-            )}
-            {showDeployment && (
+
+            </div>
+          )}
+
+          {/* ══ Relationships tab ═══════════════════════════ */}
+          {activeTab === 'relationships' && showRelationships && (
+            <div className="ef-tab-panel" role="tabpanel">
               <div className="form-group">
-                <FieldLabel htmlFor="entity-deploy" helpKey="deployment">Deployment</FieldLabel>
-                <select id="entity-deploy" value={deploymentStage} onChange={(e) => setDeploymentStage(e.target.value as DeploymentStage | '')}>
-                  <option value="">—</option>
-                  {ALL_DEPLOYMENT_STAGES.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-            )}
-          </div>
-          )}
+                <div className="field-label-wrap">
+                  <label>Relationships</label>
+                </div>
 
-          {/* ── Technology + Tech Convergency ─────────────── */}
-          {showTechFields && (
-          <div className="form-row">
-            <div className="form-group flex-2">
-              <FieldLabel htmlFor="entity-tech" helpKey="technology">Technology</FieldLabel>
-              <input id="entity-tech" type="text" value={technology} onChange={(e) => setTechnology(e.target.value)} placeholder="e.g. Java / Spring Boot" />
-            </div>
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-convergency" helpKey="techConvergency">Tech Convergency</FieldLabel>
-              <select id="entity-convergency" value={techConvergency} onChange={(e) => setTechConvergency(Number(e.target.value) as TechConvergency | 0)}>
-                <option value={0}>—</option>
-                <option value={1}>1 (Low)</option>
-                <option value={2}>2 (Medium)</option>
-                <option value={3}>3 (High)</option>
-              </select>
-            </div>
-          </div>
-          )}
+                {relDrafts.length > 0 && (
+                  <div className="rel-drafts-list">
+                    {relDrafts.map((draft, idx) => (
+                      <div key={idx} className="rel-draft-item">
+                        <div className="rel-draft-summary">
+                          <span className="rel-draft-direction">{draft.direction === 'outgoing' ? '→' : '←'}</span>
+                          <select
+                            className="rel-draft-type"
+                            value={draft.type}
+                            onChange={(e) => updateRelDraft(idx, { type: e.target.value as EdgeType })}
+                          >
+                            {ALL_EDGE_TYPES.map((t) => (
+                              <option key={t} value={t}>{EDGE_TYPE_LABELS[t]}</option>
+                            ))}
+                          </select>
+                          <select
+                            className="rel-draft-target"
+                            value={draft.targetId}
+                            onChange={(e) => updateRelDraft(idx, { targetId: e.target.value })}
+                          >
+                            <option value="">— Entity —</option>
+                            {entities.filter((e) => e.id !== editing?.id).map((e) => (
+                              <option key={e.id} value={e.id}>{e.name} [{e.kind}]</option>
+                            ))}
+                          </select>
+                          <input
+                            className="rel-draft-label"
+                            type="text"
+                            value={draft.label}
+                            onChange={(e) => updateRelDraft(idx, { label: e.target.value })}
+                            placeholder="Label"
+                          />
+                          <input
+                            className="rel-draft-protocol"
+                            type="text"
+                            value={draft.protocol}
+                            onChange={(e) => updateRelDraft(idx, { protocol: e.target.value })}
+                            placeholder="Protocol"
+                          />
+                          <button type="button" className="btn-icon btn-danger-icon" onClick={() => removeRelDraft(idx)} aria-label="Remove relationship">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-          {/* ── TPS + Compute ────────────────────────────── */}
-          {showTpsCompute && (
-          <div className="form-row">
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-tps" helpKey="tps">TPS</FieldLabel>
-              <input id="entity-tps" type="number" min={0} value={tps} onChange={(e) => setTps(e.target.value)} placeholder="e.g. 1000" />
-            </div>
-            <div className="form-group">
-              <FieldLabel htmlFor="entity-compute" helpKey="compute">Compute</FieldLabel>
-              <select id="entity-compute" value={compute} onChange={(e) => setCompute(e.target.value as TShirtSize | '')}>
-                <option value="">—</option>
-                {ALL_TSHIRT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          )}
-
-          {/* ── Code Repository ──────────────────────────── */}
-          {showCodeRepo && (
-          <div className="form-group">
-            <FieldLabel htmlFor="entity-repo" helpKey="codeRepository">Code Repository</FieldLabel>
-            <input id="entity-repo" type="text" value={codeRepository} onChange={(e) => setCodeRepository(e.target.value)} placeholder="e.g. https://github.com/org/repo" />
-          </div>
-          )}
-
-          {/* ── PII + PCI-DSS checkboxes ─────────────────── */}
-          {showCompliance && (
-          <div className="form-row">
-            <div className="form-group form-checkbox-group">
-              <label className="checkbox-label">
-                <input type="checkbox" checked={pii} onChange={(e) => setPii(e.target.checked)} />
-                PII
-              </label>
-              <button
-                type="button"
-                className="field-help-btn"
-                onClick={() => {}}
-                title={FIELD_HELP.pii}
-                aria-label="Help for PII"
-              >
-                <HelpCircle size={13} />
-              </button>
-            </div>
-            <div className="form-group form-checkbox-group">
-              <label className="checkbox-label">
-                <input type="checkbox" checked={pciDss} onChange={(e) => setPciDss(e.target.checked)} />
-                PCI-DSS
-              </label>
-              <button
-                type="button"
-                className="field-help-btn"
-                onClick={() => {}}
-                title={FIELD_HELP.pciDss}
-                aria-label="Help for PCI-DSS"
-              >
-                <HelpCircle size={13} />
-              </button>
-            </div>
-          </div>
-          )}
-
-          {/* ── Owner ────────────────────────────────────── */}
-          {showOwner && (
-          <div className="form-group">
-            <FieldLabel htmlFor="entity-owner" helpKey="owner">Owner</FieldLabel>
-            <input id="entity-owner" type="text" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Team or person" />
-          </div>
-          )}
-
-          {/* ── Notes ────────────────────────────────────── */}
-          <div className="form-group">
-            <FieldLabel htmlFor="entity-notes" helpKey="notes">Notes</FieldLabel>
-            <textarea id="entity-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Additional notes" />
-          </div>
-          {/* ── Relationships ────────────────────────────── */}
-          {showRelationships && (
-          <div className="form-group">
-            <div className="field-label-wrap">
-              <label>Relationships</label>
-            </div>
-
-            {relDrafts.length > 0 && (
-              <div className="rel-drafts-list">
-                {relDrafts.map((draft, idx) => (
-                  <div key={idx} className="rel-draft-item">
-                    <div className="rel-draft-summary">
-                      <span className="rel-draft-direction">{draft.direction === 'outgoing' ? '→' : '←'}</span>
-                      <select
-                        className="rel-draft-type"
-                        value={draft.type}
-                        onChange={(e) => updateRelDraft(idx, { type: e.target.value as EdgeType })}
-                      >
+                {showAddRel ? (
+                  <div className="rel-add-form">
+                    <div className="rel-add-row">
+                      <select value={newRelDirection} onChange={(e) => setNewRelDirection(e.target.value as 'outgoing' | 'incoming')}>
+                        <option value="outgoing">→ Outgoing</option>
+                        <option value="incoming">← Incoming</option>
+                      </select>
+                      <select value={newRelType} onChange={(e) => setNewRelType(e.target.value as EdgeType)}>
                         {ALL_EDGE_TYPES.map((t) => (
                           <option key={t} value={t}>{EDGE_TYPE_LABELS[t]}</option>
                         ))}
                       </select>
-                      <select
-                        className="rel-draft-target"
-                        value={draft.targetId}
-                        onChange={(e) => updateRelDraft(idx, { targetId: e.target.value })}
-                      >
-                        <option value="">— Entity —</option>
+                      <select value={newRelTargetId} onChange={(e) => setNewRelTargetId(e.target.value)}>
+                        <option value="">— Target Entity —</option>
                         {entities.filter((e) => e.id !== editing?.id).map((e) => (
                           <option key={e.id} value={e.id}>{e.name} [{e.kind}]</option>
                         ))}
                       </select>
+                    </div>
+                    <div className="rel-add-row">
                       <input
-                        className="rel-draft-label"
                         type="text"
-                        value={draft.label}
-                        onChange={(e) => updateRelDraft(idx, { label: e.target.value })}
-                        placeholder="Label"
+                        value={newRelLabel}
+                        onChange={(e) => setNewRelLabel(e.target.value)}
+                        placeholder="Label (e.g. Makes API calls) *"
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRelDraft(); } }}
                       />
                       <input
-                        className="rel-draft-protocol"
                         type="text"
-                        value={draft.protocol}
-                        onChange={(e) => updateRelDraft(idx, { protocol: e.target.value })}
-                        placeholder="Protocol"
+                        value={newRelProtocol}
+                        onChange={(e) => setNewRelProtocol(e.target.value)}
+                        placeholder="Protocol (e.g. HTTPS)"
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRelDraft(); } }}
                       />
-                      <button type="button" className="btn-icon btn-danger-icon" onClick={() => removeRelDraft(idx)} aria-label="Remove relationship">
-                        <Trash2 size={12} />
+                    </div>
+                    <div className="rel-add-actions">
+                      <button type="button" className="btn btn-sm" onClick={addRelDraft} disabled={!newRelTargetId || !newRelLabel.trim()}>
+                        <Plus size={14} /> Add
+                      </button>
+                      <button type="button" className="btn btn-sm btn-secondary" onClick={() => { setShowAddRel(false); resetNewRel(); }}>
+                        Cancel
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {showAddRel ? (
-              <div className="rel-add-form">
-                <div className="rel-add-row">
-                  <select value={newRelDirection} onChange={(e) => setNewRelDirection(e.target.value as 'outgoing' | 'incoming')}>
-                    <option value="outgoing">→ Outgoing</option>
-                    <option value="incoming">← Incoming</option>
-                  </select>
-                  <select value={newRelType} onChange={(e) => setNewRelType(e.target.value as EdgeType)}>
-                    {ALL_EDGE_TYPES.map((t) => (
-                      <option key={t} value={t}>{EDGE_TYPE_LABELS[t]}</option>
-                    ))}
-                  </select>
-                  <select value={newRelTargetId} onChange={(e) => setNewRelTargetId(e.target.value)}>
-                    <option value="">— Target Entity —</option>
-                    {entities.filter((e) => e.id !== editing?.id).map((e) => (
-                      <option key={e.id} value={e.id}>{e.name} [{e.kind}]</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="rel-add-row">
-                  <input
-                    type="text"
-                    value={newRelLabel}
-                    onChange={(e) => setNewRelLabel(e.target.value)}
-                    placeholder="Label (e.g. Makes API calls) *"
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRelDraft(); } }}
-                  />
-                  <input
-                    type="text"
-                    value={newRelProtocol}
-                    onChange={(e) => setNewRelProtocol(e.target.value)}
-                    placeholder="Protocol (e.g. HTTPS)"
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRelDraft(); } }}
-                  />
-                </div>
-                <div className="rel-add-actions">
-                  <button type="button" className="btn btn-sm" onClick={addRelDraft} disabled={!newRelTargetId || !newRelLabel.trim()}>
-                    <Plus size={14} /> Add
+                ) : (
+                  <button type="button" className="btn btn-sm" onClick={() => setShowAddRel(true)}>
+                    <Plus size={14} /> Add Relationship
                   </button>
-                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => { setShowAddRel(false); resetNewRel(); }}>
-                    Cancel
-                  </button>
-                </div>
+                )}
               </div>
-            ) : (
-              <button type="button" className="btn btn-sm" onClick={() => setShowAddRel(true)}>
-                <Plus size={14} /> Add Relationship
-              </button>
-            )}
-          </div>
+            </div>
           )}
 
           <div className="form-actions">
@@ -757,5 +847,6 @@ export const EntityForm: React.FC = () => {
         </form>
       </div>
     </div>
+  </>
   );
 };

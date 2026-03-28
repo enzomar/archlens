@@ -298,35 +298,18 @@ export const createDataSlice = (set: StoreSet, get: StoreGet, initialTab: Diagra
       return visible;
     }
 
-    // ── Global viewpoint ───────────────────────────────────────────────────────
-    if (s.viewpoint === 'global') {
-      const allowedKinds = new Set(getKindsForViewpointLevel('global', s.zoomLevel));
-      let visible = s.entities.filter((e) => allowedKinds.has(e.kind));
-
-      let changed = true;
-      while (changed) {
-        changed = false;
-        const visibleIds = new Set(visible.map((e) => e.id));
-        for (const e of [...visible]) {
-          if (e.parentId && !visibleIds.has(e.parentId)) {
-            const parent = s.entities.find((p) => p.id === e.parentId);
-            if (parent) { visible = [...visible, parent]; changed = true; }
-          }
+    // ── Standard C4 multi-select view ────────────────────────────────────────
+    const allowedKinds = new Set<string>();
+    for (const vp of s.activeViewpoints) {
+      for (const zl of s.activeZoomLevels) {
+        for (const k of getKindsForViewpointLevel(vp, zl)) {
+          allowedKinds.add(k);
         }
       }
-
-      const f = s.filters;
-      if (f.kinds && f.kinds.length > 0) visible = visible.filter((e) => f.kinds!.includes(e.kind));
-      if (f.maturities && f.maturities.length > 0) visible = visible.filter((e) => e.metadata.maturity && f.maturities!.includes(e.metadata.maturity));
-      if (f.tags && f.tags.length > 0) visible = visible.filter((e) => f.tags!.some((t) => e.metadata.tags.includes(t)));
-      if (f.deploymentStages && f.deploymentStages.length > 0) visible = visible.filter((e) => e.metadata.deploymentStage && f.deploymentStages!.includes(e.metadata.deploymentStage));
-      return visible;
     }
-
-    // ── Standard C4 zoom view ──────────────────────────────────────────────────
-    const vp = s.viewpoint;
-    const allowedKinds = new Set(getKindsForViewpointLevel(vp, s.zoomLevel));
-    let visible = s.entities.filter((e) => allowedKinds.has(e.kind) && e.viewpoint === vp);
+    let visible = s.entities.filter(
+      (e) => allowedKinds.has(e.kind) && s.activeViewpoints.includes(e.viewpoint)
+    );
 
     // Walk up and include ancestor frames at every level
     let changed = true;
@@ -346,6 +329,25 @@ export const createDataSlice = (set: StoreSet, get: StoreGet, initialTab: Diagra
     if (f.maturities && f.maturities.length > 0) visible = visible.filter((e) => e.metadata.maturity && f.maturities!.includes(e.metadata.maturity));
     if (f.tags && f.tags.length > 0) visible = visible.filter((e) => f.tags!.some((t) => e.metadata.tags.includes(t)));
     if (f.deploymentStages && f.deploymentStages.length > 0) visible = visible.filter((e) => e.metadata.deploymentStage && f.deploymentStages!.includes(e.metadata.deploymentStage));
+
+    // ── Expand in place: reveal children of double-clicked entities ─────────
+    const { expandedEntityIds } = s;
+    if (expandedEntityIds.size > 0) {
+      let expanding = true;
+      while (expanding) {
+        expanding = false;
+        const visibleIds = new Set(visible.map((e) => e.id));
+        for (const expandedId of expandedEntityIds) {
+          if (!visibleIds.has(expandedId)) continue;
+          for (const child of s.entities.filter((e) => e.parentId === expandedId)) {
+            if (!visibleIds.has(child.id)) {
+              visible = [...visible, child];
+              expanding = true;
+            }
+          }
+        }
+      }
+    }
 
     return visible;
   },

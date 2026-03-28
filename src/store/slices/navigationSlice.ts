@@ -8,9 +8,29 @@ export const createNavigationSlice = (set: StoreSet, get: StoreGet) => ({
   focusEntityId: null as string | null,
   breadcrumb: [] as { id: string; name: string; level: ZoomLevel }[],
   diagramMode: 'focused' as DiagramMode,
+  activeZoomLevels: ['context'] as ZoomLevel[],
+  activeViewpoints: ['application'] as Viewpoint[],
+
+  toggleActiveZoomLevel: (level: ZoomLevel) => {
+    const current = get().activeZoomLevels;
+    const next = current.includes(level)
+      ? current.length > 1 ? current.filter((l) => l !== level) : current
+      : [...current, level];
+    set({ activeZoomLevels: next, zoomLevel: next[next.length - 1], expandedEntityIds: new Set<string>() });
+    get().addLogEntry('debug', `Active zoom levels: ${next.join(', ')}`);
+  },
+
+  toggleActiveViewpoint: (vp: Viewpoint) => {
+    const current = get().activeViewpoints;
+    const next = current.includes(vp)
+      ? current.length > 1 ? current.filter((v) => v !== vp) : current
+      : [...current, vp];
+    set({ activeViewpoints: next, viewpoint: next[next.length - 1], expandedEntityIds: new Set<string>() });
+    get().addLogEntry('debug', `Active viewpoints: ${next.join(', ')}`);
+  },
 
   setZoomLevel: (level: ZoomLevel) => {
-    set({ zoomLevel: level, focusEntityId: null, breadcrumb: [] });
+    set({ zoomLevel: level, focusEntityId: null, breadcrumb: [], activeZoomLevels: [level], expandedEntityIds: new Set<string>() });
     get().addLogEntry('debug', `Zoom level changed to ${level}`);
   },
 
@@ -20,7 +40,7 @@ export const createNavigationSlice = (set: StoreSet, get: StoreGet) => ({
   },
 
   setViewpoint: (vp: Viewpoint) => {
-    set({ viewpoint: vp, focusEntityId: null, breadcrumb: [] });
+    set({ viewpoint: vp, focusEntityId: null, breadcrumb: [], activeViewpoints: [vp], expandedEntityIds: new Set<string>() });
     get().addLogEntry('debug', `Viewpoint changed to ${vp}`);
   },
 
@@ -42,6 +62,8 @@ export const createNavigationSlice = (set: StoreSet, get: StoreGet) => ({
         { id: entityId, name: entity.name, level: state.zoomLevel },
       ],
       selectedEntityId: null,
+      expandedEntityIds: new Set<string>(),
+      activeZoomLevels: [targetZoom],
     });
 
     // ── Prezi-like auto-fit: zoom the camera to frame the children ──
@@ -85,6 +107,8 @@ export const createNavigationSlice = (set: StoreSet, get: StoreGet) => ({
       focusEntityId: newBreadcrumb.length > 0 ? newBreadcrumb[newBreadcrumb.length - 1].id : null,
       breadcrumb: newBreadcrumb,
       selectedEntityId: null,
+      expandedEntityIds: new Set<string>(),
+      activeZoomLevels: [popped.level],
     });
     get().addLogEntry('debug', `Drilled up to ${popped.level}`);
   },

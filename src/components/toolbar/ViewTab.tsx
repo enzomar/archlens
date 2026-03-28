@@ -5,7 +5,7 @@ import {
   KIND_COLORS, MATURITY_COLORS, getKindsForViewpointLevel,
 } from '../../domain/types';
 import type { EntityKind, Maturity, DeploymentStage, PredefinedTag } from '../../domain/types';
-import { Target, Maximize2, SlidersHorizontal, X, LayoutList } from 'lucide-react';
+import { Target, Maximize2, SlidersHorizontal, X, LayoutList, Map, ShieldCheck, Layers, AlignJustify, ScanSearch } from 'lucide-react';
 
 const KIND_LABELS: Record<EntityKind, string> = {
   person: 'Person', system: 'System', container: 'Container', component: 'Component',
@@ -22,14 +22,25 @@ const STAGE_LABELS: Record<DeploymentStage, string> = {
 };
 
 export const ViewTab: React.FC = () => {
-  const viewpoint  = useStore((s) => s.viewpoint);
-  const zoomLevel  = useStore((s) => s.zoomLevel);
   const filters    = useStore((s) => s.filters);
   const setFilters = useStore((s) => s.setFilters);
   const setScale        = useStore((s) => s.setScale);
   const setPan          = useStore((s) => s.setPan);
   const showListView    = useStore((s) => s.showListView);
   const toggleListView  = useStore((s) => s.toggleListView);
+
+  const showMinimap           = useStore((s) => s.showMinimap);
+  const showValidationPanel   = useStore((s) => s.showValidationPanel);
+  const showViewsPanel        = useStore((s) => s.showViewsPanel);
+  const logPanelOpen          = useStore((s) => s.logPanelOpen);
+  const inspectMode           = useStore((s) => s.inspectMode);
+  const activeZoomLevels      = useStore((s) => s.activeZoomLevels);
+  const activeViewpoints      = useStore((s) => s.activeViewpoints);
+  const toggleShowMinimap         = useStore((s) => s.toggleShowMinimap);
+  const toggleShowValidationPanel = useStore((s) => s.toggleShowValidationPanel);
+  const toggleShowViewsPanel      = useStore((s) => s.toggleShowViewsPanel);
+  const toggleLogPanel            = useStore((s) => s.toggleLogPanel);
+  const toggleInspectMode         = useStore((s) => s.toggleInspectMode);
 
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
@@ -48,7 +59,9 @@ export const ViewTab: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [filterOpen]);
 
-  const contextKinds     = getKindsForViewpointLevel(viewpoint, zoomLevel);
+  const contextKinds     = [...new Set(
+    activeViewpoints.flatMap((vp) => activeZoomLevels.flatMap((zl) => getKindsForViewpointLevel(vp, zl)))
+  )] as EntityKind[];
   const activeKinds      = filters.kinds ?? [];
   const activeMaturities = filters.maturities ?? [];
   const activeStages     = filters.deploymentStages ?? [];
@@ -58,7 +71,7 @@ export const ViewTab: React.FC = () => {
     activeKinds.length + activeMaturities.length + activeStages.length + activeTags.length;
 
   const toggle = <T extends string>(
-    active: T[], key: keyof typeof filters, value: T,
+    active: T[], value: T,
     mapKey: (arr: T[]) => Partial<typeof filters>
   ) => {
     const cur = new Set(active);
@@ -66,13 +79,13 @@ export const ViewTab: React.FC = () => {
     setFilters({ ...filters, ...mapKey([...cur]) });
   };
 
-  const toggleKind      = (k: EntityKind)        => toggle(activeKinds, 'kinds', k,
+  const toggleKind      = (k: EntityKind)        => toggle(activeKinds, k,
     (arr) => ({ kinds: arr.length > 0 ? arr : undefined }));
-  const toggleMaturity  = (m: Maturity)           => toggle(activeMaturities, 'maturities', m,
+  const toggleMaturity  = (m: Maturity)           => toggle(activeMaturities, m,
     (arr) => ({ maturities: arr.length > 0 ? arr : undefined }));
-  const toggleStage     = (s: DeploymentStage)    => toggle(activeStages, 'deploymentStages', s,
+  const toggleStage     = (s: DeploymentStage)    => toggle(activeStages, s,
     (arr) => ({ deploymentStages: arr.length > 0 ? arr : undefined }));
-  const toggleTag       = (t: PredefinedTag)      => toggle(activeTags, 'tags', t,
+  const toggleTag       = (t: PredefinedTag)      => toggle(activeTags, t,
     (arr) => ({ tags: arr.length > 0 ? arr : undefined }));
 
   return (
@@ -212,6 +225,73 @@ export const ViewTab: React.FC = () => {
             )}
           </div>
         )}
+      </div>
+
+      <div className="ribbon-separator" />
+
+      {/* ── Show / Hide canvas elements ────────────────── */}
+      <div className="ribbon-group">
+        <div className="ribbon-group-buttons">
+          <button
+            className={`ribbon-btn${showMinimap ? ' ribbon-btn--active' : ''}`}
+            onClick={toggleShowMinimap}
+            title={showMinimap ? 'Hide mini-map' : 'Show mini-map'}
+            aria-pressed={showMinimap}
+            disabled={showListView}
+          >
+            <span className="ribbon-btn-icon"><Map size={20} /></span>
+            <span className="ribbon-btn-label">Minimap</span>
+          </button>
+          <button
+            className={`ribbon-btn${showValidationPanel ? ' ribbon-btn--active' : ''}`}
+            onClick={toggleShowValidationPanel}
+            title={showValidationPanel ? 'Hide validation panel' : 'Show validation panel'}
+            aria-pressed={showValidationPanel}
+            disabled={showListView}
+          >
+            <span className="ribbon-btn-icon"><ShieldCheck size={20} /></span>
+            <span className="ribbon-btn-label">Validate</span>
+          </button>
+          <button
+            className={`ribbon-btn${showViewsPanel ? ' ribbon-btn--active' : ''}`}
+            onClick={toggleShowViewsPanel}
+            title={showViewsPanel ? 'Hide saved views' : 'Show saved views'}
+            aria-pressed={showViewsPanel}
+            disabled={showListView}
+          >
+            <span className="ribbon-btn-icon"><Layers size={20} /></span>
+            <span className="ribbon-btn-label">Views</span>
+          </button>
+          <button
+            className={`ribbon-btn${logPanelOpen ? ' ribbon-btn--active' : ''}`}
+            onClick={toggleLogPanel}
+            title={logPanelOpen ? 'Hide log footer' : 'Show log footer'}
+            aria-pressed={logPanelOpen}
+          >
+            <span className="ribbon-btn-icon"><AlignJustify size={20} /></span>
+            <span className="ribbon-btn-label">Log</span>
+          </button>
+        </div>
+        <span className="ribbon-group-label">Show</span>
+      </div>
+
+      <div className="ribbon-separator" />
+
+      {/* ── Inspect mode ──────────────────────────────────── */}
+      <div className="ribbon-group">
+        <div className="ribbon-group-buttons">
+          <button
+            className={`ribbon-btn${inspectMode ? ' ribbon-btn--active ribbon-btn--inspect' : ''}`}
+            onClick={toggleInspectMode}
+            title={inspectMode ? 'Exit inspect mode' : 'Inspect mode: hover elements to see debug info'}
+            aria-pressed={inspectMode}
+            disabled={showListView}
+          >
+            <span className="ribbon-btn-icon"><ScanSearch size={20} /></span>
+            <span className="ribbon-btn-label">Inspect</span>
+          </button>
+        </div>
+        <span className="ribbon-group-label">Debug</span>
       </div>
     </>
   );

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
-import { exportProject, exportPlantUml, exportStructurizrDsl, exportSvg, exportPng } from '../../export/exportService';
-import { VIEWPOINT_LABELS, KIND_COLORS, NODE_DIMENSIONS } from '../../domain/types';
-import type { ZoomLevel, Viewpoint } from '../../domain/types';
-import { Search, Command, Zap, Layout, Download, Eye, Undo2, Redo2, Sun, Moon, ArrowRight } from 'lucide-react';
+import { exportProject } from '../../export/exportService';
+import { NODE_DIMENSIONS } from '../../domain/types';
+import { Search, Zap, Layout, Download, Eye, Undo2, Redo2, Sun, Moon, ArrowRight } from 'lucide-react';
 
 interface PaletteItem {
   id: string;
@@ -21,21 +20,17 @@ export const CommandPalette: React.FC<{ onClose: () => void }> = ({ onClose }) =
   const listRef = useRef<HTMLDivElement>(null);
 
   const entities = useStore((s) => s.entities);
-  const setZoomLevel = useStore((s) => s.setZoomLevel);
-  const setViewpoint = useStore((s) => s.setViewpoint);
   const selectEntity = useStore((s) => s.selectEntity);
-  const positions = useStore((s) => s.positions);
-  const setPan = useStore((s) => s.setPan);
-  const setScale = useStore((s) => s.setScale);
   const autoLayout = useStore((s) => s.autoLayout);
-  const setShowEntityForm = useStore((s) => s.setShowEntityForm);
+  const setPan      = useStore((s) => s.setPan);
+  const setScale    = useStore((s) => s.setScale);
+  const setShowEntityForm  = useStore((s) => s.setShowEntityForm);
   const setShowExportPanel = useStore((s) => s.setShowExportPanel);
-  const toggleLeftSidebar = useStore((s) => s.toggleLeftSidebar);
+  const toggleLeftSidebar  = useStore((s) => s.toggleLeftSidebar);
   const toggleRightSidebar = useStore((s) => s.toggleRightSidebar);
-  const setUiMode = useStore((s) => s.setUiMode);
-  const newProject = useStore((s) => s.newProject);
-  const setTheme = useStore((s) => s.setTheme);
-  const theme = useStore((s) => s.theme);
+  const setUiMode   = useStore((s) => s.setUiMode);
+  const newProject  = useStore((s) => s.newProject);
+  const setTheme    = useStore((s) => s.setTheme);
 
   const items = useMemo<PaletteItem[]>(() => {
     const actions: PaletteItem[] = [
@@ -55,13 +50,12 @@ export const CommandPalette: React.FC<{ onClose: () => void }> = ({ onClose }) =
       { id: 'theme-dark', label: 'Theme: Dark', category: 'action', keywords: 'light mode', icon: <Moon size={14} />, action: () => { setTheme('dark'); onClose(); } },
 
       // Navigation
-      { id: 'zoom-context', label: 'Zoom: System Context', category: 'navigation', keywords: '1 zoom level', action: () => { setZoomLevel('context'); onClose(); } },
-      { id: 'zoom-container', label: 'Zoom: Container', category: 'navigation', keywords: '2 zoom level', action: () => { setZoomLevel('container'); onClose(); } },
-      { id: 'zoom-component', label: 'Zoom: Component', category: 'navigation', keywords: '3 zoom level', action: () => { setZoomLevel('component'); onClose(); } },
-      { id: 'vp-business', label: 'Viewpoint: Business', category: 'navigation', keywords: 'layer', action: () => { setViewpoint('business'); onClose(); } },
-      { id: 'vp-application', label: 'Viewpoint: Application', category: 'navigation', keywords: 'layer', action: () => { setViewpoint('application'); onClose(); } },
-      { id: 'vp-technical', label: 'Viewpoint: Technical', category: 'navigation', keywords: 'layer', action: () => { setViewpoint('technical'); onClose(); } },
-      { id: 'vp-global', label: 'Viewpoint: Global', category: 'navigation', keywords: 'layer all archimate', action: () => { setViewpoint('global'); onClose(); } },
+      { id: 'zoom-context',   label: 'Zoom: System Context', category: 'navigation', keywords: '1 zoom level', action: () => { useStore.getState().toggleActiveZoomLevel('context');   onClose(); } },
+      { id: 'zoom-container', label: 'Zoom: Container',      category: 'navigation', keywords: '2 zoom level', action: () => { useStore.getState().toggleActiveZoomLevel('container'); onClose(); } },
+      { id: 'zoom-component', label: 'Zoom: Component',      category: 'navigation', keywords: '3 zoom level', action: () => { useStore.getState().toggleActiveZoomLevel('component'); onClose(); } },
+      { id: 'vp-business',    label: 'Viewpoint: Business',    category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('business');    onClose(); } },
+      { id: 'vp-application', label: 'Viewpoint: Application', category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('application'); onClose(); } },
+      { id: 'vp-technical',   label: 'Viewpoint: Technical',   category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('technical');   onClose(); } },
     ];
 
     // Entity search items

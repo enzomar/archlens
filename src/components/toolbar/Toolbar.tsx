@@ -7,6 +7,7 @@ import { InsertTab } from './InsertTab';
 import { ViewTab } from './ViewTab';
 import { FormatTab } from './FormatTab';
 import { HelpTab } from './HelpTab';
+import { SettingsTab } from './SettingsTab';
 import { ToolbarDialogs } from './ToolbarDialogs';
 import {
   Save, Sun, Moon, Monitor,
@@ -14,7 +15,7 @@ import {
   Undo2, Redo2,
 } from 'lucide-react';
 
-type RibbonTab = 'file' | 'insert' | 'view' | 'format' | 'help';
+type RibbonTab = 'file' | 'insert' | 'view' | 'format' | 'settings' | 'help';
 
 const THEME_ICONS: Record<ThemeMode, React.ReactNode> = {
   light: <Sun size={16} />,
@@ -102,7 +103,7 @@ export const Toolbar: React.FC = () => {
           </div>
 
           <nav className="ribbon-tabs" role="tablist" aria-label="Ribbon tabs">
-            {(['file', 'insert', 'view', 'format', 'help'] as RibbonTab[]).map((tab) => (
+            {(['file', 'insert', 'view', 'format', 'settings', 'help'] as RibbonTab[]).map((tab) => (
               <button
                 key={tab}
                 className={`ribbon-tab ${activeTab === tab && !ribbonCollapsed ? 'ribbon-tab--active' : ''}`}
@@ -193,6 +194,7 @@ export const Toolbar: React.FC = () => {
         {activeTab === 'insert' && <InsertTab />}
         {activeTab === 'view' && <ViewTab />}
         {activeTab === 'format' && <FormatTab />}
+        {activeTab === 'settings' && <SettingsTab />}
         {activeTab === 'help' && <HelpTab onShowHelp={() => setShowHelp(true)} />}
       </div>
 

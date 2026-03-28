@@ -1,0 +1,199 @@
+/* ═══════════════════════════════════════════════════════════════
+   Responsive — Tablet, mobile media queries, reduced motion
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── RESPONSIVE: TABLET ────────────────────────────────────── */
+
+/* Slide-in animations for overlay panels */
+@keyframes sidebar-slide-from-left {
+  from { transform: translateX(-100%); opacity: 0.6; }
+  to   { transform: translateX(0);     opacity: 1;   }
+}
+@keyframes sidebar-slide-from-right {
+  from { transform: translateX(100%);  opacity: 0.6; }
+  to   { transform: translateX(0);     opacity: 1;   }
+}
+
+@media (max-width: 1024px) {
+  /* ── Overlay panels: sidebars float over the canvas ─────── */
+  .app-body {
+    position: relative;
+  }
+
+  .canvas-and-log {
+    position: relative; /* anchor for the scrim pseudo-element */
+  }
+
+  .left-sidebar {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    height: 100% !important;
+    z-index: 50;
+    width: 280px !important;
+    min-width: 0 !important;
+    max-width: 280px !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.22);
+    animation: sidebar-slide-from-left 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+
+  .right-sidebar {
+    position: absolute !important;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    height: 100% !important;
+    z-index: 50;
+    width: 280px !important;
+    min-width: 0 !important;
+    max-width: 280px !important;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.22);
+    animation: sidebar-slide-from-right 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  }
+
+  /* Hide horizontal resize handles — panels are overlays, not flex peers */
+  .resize-handle--horizontal {
+    display: none !important;
+  }
+
+  /* Scrim: dim canvas when a sidebar overlay is open */
+  .app-body:has(.left-sidebar) .canvas-and-log::before,
+  .app-body:has(.right-sidebar) .canvas-and-log::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.18);
+    z-index: 49;
+    pointer-events: none;
+    backdrop-filter: blur(0.5px);
+  }
+
+  /* ── Touch targets ───────────────────────────────────────── */
+  .diagram-nav-bar {
+    height: 36px;
+    padding: 0 6px;
+  }
+
+  .panel-toggle-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* ── Ribbon: icon-only mode for compact height ───────────── */
+  .ribbon-tabbar {
+    height: 34px;
+  }
+
+  .ribbon-tab {
+    padding: 6px 12px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .ribbon-body {
+    height: auto;
+    min-height: 48px;
+    padding: 4px 6px;
+  }
+
+  /* Hide text labels; icons alone communicate intent at a glance */
+  .ribbon-btn-label {
+    display: none;
+  }
+
+  .ribbon-btn {
+    min-width: 40px;
+    padding: 8px 8px;
+    gap: 0;
+  }
+
+  /* ── Panels / forms ──────────────────────────────────────── */
+  .detail-panel {
+    width: 240px;
+    min-width: 200px;
+    max-width: 240px;
+    padding: 12px;
+  }
+
+  .ribbon-tabbar-center {
+    display: none;
+  }
+
+  .export-options {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── RESPONSIVE: MOBILE ────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .app-body {
+    flex-direction: column;
+  }
+
+  .detail-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    max-height: 40vh;
+  }
+
+  .detail-panel--empty {
+    display: none;
+  }
+
+  .ribbon-body {
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+    overflow-x: auto;
+  }
+
+  .ribbon-tabbar {
+    padding: 0 8px;
+    gap: 6px;
+  }
+
+  .ribbon-tabbar-center {
+    display: none;
+  }
+
+  .ribbon-tabbar-right {
+    display: none;
+  }
+
+  .modal-content {
+    width: 95vw;
+    max-height: 90vh;
+    padding: 16px;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .canvas-footer {
+    right: 8px;
+    top: 8px;
+  }
+}
+
+/* ── REDUCED MOTION ────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,4 +1,4 @@
-import type { ArchEntity, Relationship, NodePosition, NodeDisplayMode, Viewpoint, ZoomLevel } from '../domain/types';
+import type { ArchEntity, Relationship, NodePosition, NodeDisplayMode, Viewpoint, ZoomLevel, EntityKind } from '../domain/types';
 import { NODE_DIMENSIONS, NODE_DIMENSIONS_EXTENDED, KIND_TO_ZOOM } from '../domain/types';
 
 // ─── LAYOUT DIRECTION ─────────────────────────────────────────────
@@ -42,8 +42,17 @@ function resolveSpacing(zoomLevel?: ZoomLevel): {
 // Padding used by the global (multi-viewpoint) layout
 const PADDING = 80;
 
+export type LayoutStrategy = 'nested' | 'flat' | 'pure-layers';
+
+export interface EdgeRoute {
+  relationshipId: string;
+  points: Array<{ x: number; y: number }>;
+}
+
 export interface LayoutResult {
   positions: NodePosition[];
+  edgeRoutes?: EdgeRoute[];
+  strategy?: LayoutStrategy;
 }
 
 // Kind priority within a layer (lower number = placed first / leftmost / topmost)
@@ -86,7 +95,7 @@ const ACTOR_KINDS = new Set(['person', 'trigger']);
  *   6. Assign pixel coordinates (TD or LR, centred, parent-groups clustered)
  *   7. Preserve locked node positions
  */
-export function computeLayout(
+function computeSugiyamaLayout(
   entities: ArchEntity[],
   existingPositions: NodePosition[],
   displayMode: NodeDisplayMode = 'standard',
@@ -382,6 +391,286 @@ export function computeLayout(
   }
 
   return { positions };
+}
+
+// ─── ADAPTIVE MULTI-FILTER LAYOUT ────────────────────────────────────────────
+
+// Swimlane layout constants
+const SWIM_OUTER_PAD   = 60;
+const SWIM_LANE_HEADER = 44;
+const SWIM_LANE_PAD_X  = 50;
+const SWIM_LANE_PAD_Y  = 36;
+const SWIM_LANE_GAP    = 80;
+const SWIM_GROUP_GAP_X = 60;
+const SWIM_NODE_GAP_X  = 30;
+const SWIM_NODE_GAP_Y  = 30;
+const SWIM_INNER_PAD   = 16;
+
+// Viewpoint display order for swimlanes
+const SWIM_LANE_ORDER: Viewpoint[] = ['business', 'application', 'technical'];
+
+/** Returns the visible hierarchy depth: 0 = flat, 1 = one parent level, 2 = two levels (capped). */
+function detectHierarchyDepth(entities: ArchEntity[]): number {
+  const idSet = new Set(entities.map((e) => e.id));
+  const memo  = new Map<string, number>();
+  function depthOf(id: string): number {
+    if (memo.has(id)) return memo.get(id)!;
+    const e = entities.find((x) => x.id === id);
+    if (!e || !e.parentId || !idSet.has(e.parentId)) { memo.set(id, 0); return 0; }
+    const d = 1 + depthOf(e.parentId);
+    memo.set(id, d);
+    return d;
+  }
+  let maxD = 0;
+  for (const e of entities) maxD = Math.max(maxD, depthOf(e.id));
+  return Math.min(maxD, 2);
+}
+
+/**
+ * Layout a single cluster: optional root → children row → optional grandchildren.
+ * Returns computed (x, y) for every node plus the cluster bounding box.
+ */
+function layoutCluster(
+  root: ArchEntity | null,
+  children: ArchEntity[],
+  grandchildren: Map<string, ArchEntity[]>,
+  startX: number,
+  startY: number,
+  DIMS: Record<EntityKind, { width: number; height: number }>,
+  strategy: LayoutStrategy,
+): { width: number; height: number; positions: Array<{ id: string; x: number; y: number }> } {
+  const out: Array<{ id: string; x: number; y: number }> = [];
+
+  // Compute per-child column widths (max of child width vs its grandchild row width)
+  type Col = { ent: ArchEntity; colW: number; gcs: ArchEntity[] };
+  const cols: Col[] = [];
+  let childRowW = 0;
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
+    const cd = DIMS[child.kind];
+    const gcs = (strategy === 'nested' ? grandchildren.get(child.id) : undefined) ?? [];
+    let gcW = 0;
+    for (let j = 0; j < gcs.length; j++) gcW += DIMS[gcs[j].kind].width + (j > 0 ? SWIM_NODE_GAP_X : 0);
+    const colW = Math.max(cd.width, gcW);
+    cols.push({ ent: child, colW, gcs });
+    childRowW += colW + (i > 0 ? SWIM_NODE_GAP_X : 0);
+  }
+
+  const childAreaW = cols.length > 0 ? childRowW + SWIM_INNER_PAD * 2 : 0;
+  const rootW      = root ? DIMS[root.kind].width : 0;
+  const clusterW   = Math.max(rootW, childAreaW);
+  let curY = startY;
+
+  // Root centred at top of cluster
+  if (root) {
+    out.push({ id: root.id, x: startX + (clusterW - rootW) / 2, y: curY });
+    curY += DIMS[root.kind].height + SWIM_NODE_GAP_Y;
+  }
+
+  // Children + grandchildren
+  if (cols.length > 0) {
+    let colX = startX + SWIM_INNER_PAD;
+    let maxChildH = 0;
+    let maxGcH    = 0;
+    for (const col of cols) {
+      const cd = DIMS[col.ent.kind];
+      out.push({ id: col.ent.id, x: colX + (col.colW - cd.width) / 2, y: curY });
+      maxChildH = Math.max(maxChildH, cd.height);
+      if (col.gcs.length > 0) {
+        let gcX = colX;
+        const gcY = curY + cd.height + SWIM_NODE_GAP_Y;
+        for (const gc of col.gcs) {
+          out.push({ id: gc.id, x: gcX, y: gcY });
+          gcX += DIMS[gc.kind].width + SWIM_NODE_GAP_X;
+          maxGcH = Math.max(maxGcH, DIMS[gc.kind].height);
+        }
+      }
+      colX += col.colW + SWIM_NODE_GAP_X;
+    }
+    curY += maxChildH + (maxGcH > 0 ? SWIM_NODE_GAP_Y + maxGcH : 0) + SWIM_INNER_PAD;
+  }
+
+  return { width: clusterW, height: curY - startY, positions: out };
+}
+
+/** Orthogonal (L-shaped) edge routing for positioned nodes. */
+function routeEdgesOrthogonal(
+  relationships: Relationship[],
+  posMap: Map<string, { x: number; y: number; width: number; height: number }>,
+  visibleIds: Set<string>,
+): EdgeRoute[] {
+  const routes: EdgeRoute[] = [];
+  for (const rel of relationships) {
+    if (!visibleIds.has(rel.sourceId) || !visibleIds.has(rel.targetId)) continue;
+    const src = posMap.get(rel.sourceId);
+    const tgt = posMap.get(rel.targetId);
+    if (!src || !tgt) continue;
+    const srcCX = src.x + src.width  / 2;
+    const srcCY = src.y + src.height / 2;
+    const tgtCX = tgt.x + tgt.width  / 2;
+    const tgtCY = tgt.y + tgt.height / 2;
+    if (Math.abs(tgtCY - srcCY) >= Math.abs(tgtCX - srcCX)) {
+      // Vertically dominant: exit bottom/top, route via mid Y
+      const sx = srcCX, tx = tgtCX;
+      const sy = srcCY < tgtCY ? src.y + src.height : src.y;
+      const ty = srcCY < tgtCY ? tgt.y : tgt.y + tgt.height;
+      const midY = (sy + ty) / 2;
+      routes.push({ relationshipId: rel.id, points: [{ x: sx, y: sy }, { x: sx, y: midY }, { x: tx, y: midY }, { x: tx, y: ty }] });
+    } else {
+      // Horizontally dominant: exit right/left, route via mid X
+      const sy = srcCY, ty = tgtCY;
+      const sx = srcCX < tgtCX ? src.x + src.width  : src.x;
+      const tx = srcCX < tgtCX ? tgt.x               : tgt.x + tgt.width;
+      const midX = (sx + tx) / 2;
+      routes.push({ relationshipId: rel.id, points: [{ x: sx, y: sy }, { x: midX, y: sy }, { x: midX, y: ty }, { x: tx, y: ty }] });
+    }
+  }
+  return routes;
+}
+
+/**
+ * Adaptive swimlane layout for multi-filter views (multiple viewpoints or zoom levels).
+ *
+ * Lanes correspond to viewpoints stacked top-to-bottom: Business → Application → Technical.
+ * Within each lane, related entities are grouped into clusters by their visible root parent.
+ *
+ * Strategy:
+ *   nested     (hierarchy depth ≥ 2): root → children row → grandchildren
+ *   flat       (hierarchy depth = 1): root → children row
+ *   pure-layers (depth = 0):           flat row of ungrouped nodes per lane
+ */
+function computeAdaptiveLayout(
+  entities: ArchEntity[],
+  existingPositions: NodePosition[],
+  displayMode: NodeDisplayMode,
+  relationships: Relationship[],
+  activeViewpoints: Viewpoint[],
+  activeZoomLevels: ZoomLevel[],
+): LayoutResult {
+  const DIMS = displayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
+
+  // Separate locked / unlocked
+  const locked   = new Map<string, NodePosition>();
+  const unlocked: ArchEntity[] = [];
+  for (const entity of entities) {
+    const pos = existingPositions.find((p) => p.entityId === entity.id);
+    if (pos?.locked) locked.set(entity.id, pos);
+    else             unlocked.push(entity);
+  }
+  if (unlocked.length === 0) return { positions: [...locked.values()] };
+
+  // Cap nesting depth for fine-grained zoom levels (component/code → max 1 level)
+  const isFineGrained = activeZoomLevels.length > 0 &&
+    activeZoomLevels.every((z) => z === 'component' || z === 'code');
+  const rawDepth = detectHierarchyDepth(unlocked);
+  const depth    = isFineGrained ? Math.min(rawDepth, 1) : rawDepth;
+  const strategy: LayoutStrategy = depth >= 2 ? 'nested' : depth >= 1 ? 'flat' : 'pure-layers';
+
+  // Determine which lanes to render (selected viewpoints in display order)
+  const effectiveLanes = SWIM_LANE_ORDER.filter((vp) =>
+    activeViewpoints.includes(vp) || activeViewpoints.includes('global' as Viewpoint),
+  );
+  const lanes = effectiveLanes.length > 0 ? effectiveLanes : SWIM_LANE_ORDER;
+
+  // Bucket entities into lanes; entities with no matching lane go to the first lane
+  const laneMap = new Map<Viewpoint, ArchEntity[]>();
+  for (const vp of lanes) laneMap.set(vp, []);
+  for (const e of unlocked) {
+    const vp = e.viewpoint as Viewpoint;
+    laneMap.get(laneMap.has(vp) ? vp : lanes[0])!.push(e);
+  }
+
+  const idSet     = new Set(unlocked.map((e) => e.id));
+  const positions: NodePosition[] = [...locked.values()];
+  const posMap    = new Map<string, { x: number; y: number; width: number; height: number }>();
+  let laneY = SWIM_OUTER_PAD;
+
+  for (const vp of lanes) {
+    const lane = laneMap.get(vp)!;
+    laneY += SWIM_LANE_HEADER;
+    if (lane.length === 0) { laneY += SWIM_LANE_GAP; continue; }
+
+    const nodeAreaY = laneY + SWIM_LANE_PAD_Y;
+    const laneIds   = new Set(lane.map((e) => e.id));
+
+    // Cluster roots: entities with no same-lane visible parent
+    const roots     = lane.filter((e) => !e.parentId || !laneIds.has(e.parentId));
+    const clustered = new Set<string>();
+    const clusters: Array<{
+      root: ArchEntity | null;
+      children: ArchEntity[];
+      grandchildren: Map<string, ArchEntity[]>;
+    }> = [];
+
+    for (const root of roots) {
+      clustered.add(root.id);
+      const children = lane.filter((e) => e.parentId === root.id);
+      const gcMap    = new Map<string, ArchEntity[]>();
+      for (const child of children) {
+        clustered.add(child.id);
+        if (strategy === 'nested') {
+          const gcs = lane.filter((e) => e.parentId === child.id);
+          for (const gc of gcs) clustered.add(gc.id);
+          gcMap.set(child.id, gcs);
+        }
+      }
+      clusters.push({ root, children, grandchildren: gcMap });
+    }
+
+    // Orphaned entities (cross-lane parent or unmatched) form a flat trailing cluster
+    const orphans = lane.filter((e) => !clustered.has(e.id));
+    if (orphans.length > 0) clusters.push({ root: null, children: orphans, grandchildren: new Map() });
+
+    // Place clusters left-to-right within the lane
+    let clusterX = SWIM_OUTER_PAD + SWIM_LANE_PAD_X;
+    let maxH     = 0;
+
+    for (const cluster of clusters) {
+      const { width, height, positions: cpos } = layoutCluster(
+        cluster.root, cluster.children, cluster.grandchildren,
+        clusterX, nodeAreaY, DIMS, strategy,
+      );
+      for (const { id, x, y } of cpos) {
+        if (!locked.has(id)) {
+          positions.push({ entityId: id, x, y, locked: false });
+          const ent = unlocked.find((u) => u.id === id);
+          if (ent) posMap.set(id, { x, y, width: DIMS[ent.kind].width, height: DIMS[ent.kind].height });
+        }
+      }
+      clusterX += width + SWIM_GROUP_GAP_X;
+      maxH = Math.max(maxH, height);
+    }
+    laneY = nodeAreaY + maxH + SWIM_LANE_PAD_Y + SWIM_LANE_GAP;
+  }
+
+  const edgeRoutes = routeEdgesOrthogonal(relationships, posMap, idSet);
+  return { positions, edgeRoutes, strategy };
+}
+
+/**
+ * Adaptive layout dispatcher.
+ *
+ * Single viewpoint + single zoom level → Sugiyama hierarchical layout (fast path).
+ * Multiple viewpoints or zoom levels   → adaptive swimlane layout.
+ */
+export function computeLayout(
+  entities: ArchEntity[],
+  existingPositions: NodePosition[],
+  displayMode: NodeDisplayMode = 'standard',
+  relationships: Relationship[] = [],
+  activeViewpoints: Viewpoint[] = [],
+  activeZoomLevels: ZoomLevel[] = [],
+): LayoutResult {
+  if (activeViewpoints.length <= 1 && activeZoomLevels.length <= 1) {
+    return computeSugiyamaLayout(
+      entities, existingPositions, displayMode, relationships,
+      activeViewpoints[0], activeZoomLevels[0],
+    );
+  }
+  return computeAdaptiveLayout(
+    entities, existingPositions, displayMode, relationships,
+    activeViewpoints, activeZoomLevels,
+  );
 }
 
 /**

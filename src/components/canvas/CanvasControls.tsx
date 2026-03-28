@@ -18,8 +18,9 @@ export const CanvasControls: React.FC = () => {
   const visualConfig = useStore((s) => s.visualConfig);
   const setVisualConfig = useStore((s) => s.setVisualConfig);
   const getVisibleEntities = useStore((s) => s.getVisibleEntities);
+  const miniMapOpen       = useStore((s) => s.showMinimap);
+  const setMiniMapOpen    = useStore((s) => s.toggleShowMinimap);
 
-  const [miniMapOpen, setMiniMapOpen] = useState(true);
   const miniMapRef = useRef<SVGSVGElement>(null);
   // State for dragging the viewport rect inside the minimap
   const [mmDrag, setMmDrag] = useState<{ startMx: number; startMy: number; startPanX: number; startPanY: number } | null>(null);
@@ -134,7 +135,7 @@ export const CanvasControls: React.FC = () => {
       <div className={`canvas-minimap ${miniMapOpen ? 'canvas-minimap--open' : ''}`}>
         <button
           className="canvas-minimap-toggle"
-          onClick={() => setMiniMapOpen(!miniMapOpen)}
+          onClick={() => setMiniMapOpen()}
           title={miniMapOpen ? 'Collapse mini-map' : 'Expand mini-map'}
           aria-label={miniMapOpen ? 'Collapse mini-map' : 'Expand mini-map'}
           aria-expanded={miniMapOpen}
