@@ -30,6 +30,16 @@
 /* Entity form is wider to accommodate the tabbed layout */
 .modal-content.entity-form {
   width: 680px;
+  height: 620px;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-content.entity-form > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ── ENTITY FORM TABS ──────────────────────────────────────── */
@@ -86,8 +96,22 @@
   line-height: 1;
 }
 
+.ef-tab-badge--error {
+  background: #e74c3c;
+}
+
+.ef-tab-btn--error {
+  color: #e74c3c;
+}
+
+.ef-tab-btn--error.active {
+  border-bottom-color: #e74c3c;
+}
+
 .ef-tab-panel {
-  min-height: 180px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 @keyframes modal-in {
@@ -182,9 +206,10 @@
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 /* ── TAG SELECTOR ──────────────────────────────────────────── */

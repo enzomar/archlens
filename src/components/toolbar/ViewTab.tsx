@@ -4,13 +4,24 @@ import {
   ALL_MATURITIES, ALL_DEPLOYMENT_STAGES, ALL_PREDEFINED_TAGS,
   KIND_COLORS, MATURITY_COLORS, getKindsForViewpointLevel,
 } from '../../domain/types';
-import type { EntityKind, Maturity, DeploymentStage, PredefinedTag } from '../../domain/types';
-import { Target, Maximize2, SlidersHorizontal, X, LayoutList, Map, ShieldCheck, Layers, AlignJustify, ScanSearch } from 'lucide-react';
+import type { EntityKind, Maturity, DeploymentStage, PredefinedTag, ViewMode } from '../../domain/types';
+import { Target, Maximize2, SlidersHorizontal, X, LayoutList, Map, ShieldCheck, Layers, AlignJustify, ScanSearch, Network, BarChart3, Building2 } from 'lucide-react';
 
 const KIND_LABELS: Record<EntityKind, string> = {
   person: 'Person', system: 'System', container: 'Container', component: 'Component',
   artifact: 'Artifact', trigger: 'Trigger', aimodel: 'AI Model',
   vectorstore: 'Vector Store', retriever: 'Retriever', evaluation: 'Evaluation',
+  'business-actor': 'Biz Actor', 'business-role': 'Biz Role',
+  'business-process': 'Biz Process', 'business-service': 'Biz Service',
+  'business-object': 'Biz Object', 'business-event': 'Biz Event',
+  'business-interface': 'Biz Interface', contract: 'Contract',
+  'application-component': 'App Comp', 'application-service': 'App Service',
+  'application-function': 'App Func', 'application-interface': 'App Iface',
+  'application-process': 'App Process', 'data-object': 'Data Obj',
+  node: 'Node', device: 'Device', 'system-software': 'Sys Software',
+  'technology-service': 'Tech Service', 'communication-network': 'Network',
+  'technology-interface': 'Tech Iface',
+  capability: 'Capability', stakeholder: 'Stakeholder', goal: 'Goal', requirement: 'Requirement',
 };
 
 const MATURITY_LABELS: Record<Maturity, string> = {
@@ -26,8 +37,9 @@ export const ViewTab: React.FC = () => {
   const setFilters = useStore((s) => s.setFilters);
   const setScale        = useStore((s) => s.setScale);
   const setPan          = useStore((s) => s.setPan);
-  const showListView    = useStore((s) => s.showListView);
-  const toggleListView  = useStore((s) => s.toggleListView);
+  const viewMode       = useStore((s) => s.viewMode);
+  const setViewMode     = useStore((s) => s.setViewMode);
+  const notArch = viewMode !== 'architecture';
 
   const showMinimap           = useStore((s) => s.showMinimap);
   const showValidationPanel   = useStore((s) => s.showValidationPanel);
@@ -94,14 +106,44 @@ export const ViewTab: React.FC = () => {
       <div className="ribbon-group">
         <div className="ribbon-group-buttons">
           <button
-            className={`ribbon-btn${showListView ? ' ribbon-btn--active' : ''}`}
-            onClick={toggleListView}
-            title={showListView ? 'Back to diagram canvas' : 'Switch to entity list view'}
-            aria-label={showListView ? 'Back to diagram canvas' : 'Switch to entity list view'}
-            aria-pressed={showListView}
+            className={`ribbon-btn${viewMode === 'architecture' ? ' ribbon-btn--active' : ''}`}
+            onClick={() => setViewMode('architecture')}
+            title="Architecture diagram canvas"
+            aria-label="Architecture view"
+            aria-pressed={viewMode === 'architecture'}
+          >
+            <span className="ribbon-btn-icon"><Network size={20} /></span>
+            <span className="ribbon-btn-label">Architecture</span>
+          </button>
+          <button
+            className={`ribbon-btn${viewMode === 'list' ? ' ribbon-btn--active' : ''}`}
+            onClick={() => setViewMode('list')}
+            title="Entity list view"
+            aria-label="List view"
+            aria-pressed={viewMode === 'list'}
           >
             <span className="ribbon-btn-icon"><LayoutList size={20} /></span>
             <span className="ribbon-btn-label">List</span>
+          </button>
+          <button
+            className={`ribbon-btn${viewMode === 'analysis' ? ' ribbon-btn--active' : ''}`}
+            onClick={() => setViewMode('analysis')}
+            title="Analysis view"
+            aria-label="Analysis view"
+            aria-pressed={viewMode === 'analysis'}
+          >
+            <span className="ribbon-btn-icon"><BarChart3 size={20} /></span>
+            <span className="ribbon-btn-label">Analysis</span>
+          </button>
+          <button
+            className={`ribbon-btn${viewMode === 'organization' ? ' ribbon-btn--active' : ''}`}
+            onClick={() => setViewMode('organization')}
+            title="Organization view"
+            aria-label="Organization view"
+            aria-pressed={viewMode === 'organization'}
+          >
+            <span className="ribbon-btn-icon"><Building2 size={20} /></span>
+            <span className="ribbon-btn-label">Organization</span>
           </button>
         </div>
         <span className="ribbon-group-label">Mode</span>
@@ -116,7 +158,7 @@ export const ViewTab: React.FC = () => {
             className="ribbon-btn"
             onClick={() => { setPan(0, 0); setScale(1); }}
             title="Reset view to origin"
-            disabled={showListView}
+            disabled={notArch}
           >
             <span className="ribbon-btn-icon"><Target size={20} /></span>
             <span className="ribbon-btn-label">Reset</span>
@@ -125,7 +167,7 @@ export const ViewTab: React.FC = () => {
             className="ribbon-btn"
             onClick={() => setScale(1)}
             title="Set zoom to 100%"
-            disabled={showListView}
+            disabled={notArch}
           >
             <span className="ribbon-btn-icon"><Maximize2 size={20} /></span>
             <span className="ribbon-btn-label">100%</span>
@@ -237,7 +279,7 @@ export const ViewTab: React.FC = () => {
             onClick={toggleShowMinimap}
             title={showMinimap ? 'Hide mini-map' : 'Show mini-map'}
             aria-pressed={showMinimap}
-            disabled={showListView}
+            disabled={notArch}
           >
             <span className="ribbon-btn-icon"><Map size={20} /></span>
             <span className="ribbon-btn-label">Minimap</span>
@@ -247,7 +289,7 @@ export const ViewTab: React.FC = () => {
             onClick={toggleShowValidationPanel}
             title={showValidationPanel ? 'Hide validation panel' : 'Show validation panel'}
             aria-pressed={showValidationPanel}
-            disabled={showListView}
+            disabled={notArch}
           >
             <span className="ribbon-btn-icon"><ShieldCheck size={20} /></span>
             <span className="ribbon-btn-label">Validate</span>
@@ -257,7 +299,7 @@ export const ViewTab: React.FC = () => {
             onClick={toggleShowViewsPanel}
             title={showViewsPanel ? 'Hide saved views' : 'Show saved views'}
             aria-pressed={showViewsPanel}
-            disabled={showListView}
+            disabled={notArch}
           >
             <span className="ribbon-btn-icon"><Layers size={20} /></span>
             <span className="ribbon-btn-label">Views</span>
@@ -285,7 +327,7 @@ export const ViewTab: React.FC = () => {
             onClick={toggleInspectMode}
             title={inspectMode ? 'Exit inspect mode' : 'Inspect mode: hover elements to see debug info'}
             aria-pressed={inspectMode}
-            disabled={showListView}
+            disabled={notArch}
           >
             <span className="ribbon-btn-icon"><ScanSearch size={20} /></span>
             <span className="ribbon-btn-label">Inspect</span>

@@ -1,0 +1,304 @@
+/* ── Organization View ──────────────────────────────────── */
+
+.org-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* Header: tabs + search */
+.org-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised, var(--surface));
+  flex-shrink: 0;
+}
+
+.org-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.org-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.org-tab:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+.org-tab--active {
+  background: var(--accent-muted, color-mix(in srgb, var(--accent) 14%, transparent));
+  color: var(--accent);
+}
+
+.org-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-tertiary);
+}
+
+.org-search {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-primary);
+  width: 160px;
+}
+
+.org-search::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Summary bar */
+.org-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.org-summary-sep {
+  opacity: 0.4;
+}
+
+/* Scrollable content */
+.org-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+/* Collapsible section */
+.org-section {
+  border-radius: 6px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.org-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: var(--surface-raised, var(--surface));
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.org-section-header:hover {
+  background: var(--hover);
+}
+
+.org-section-title {
+  flex: 1;
+}
+
+.org-section-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: var(--hover);
+  padding: 1px 6px;
+  border-radius: 8px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.org-section-body {
+  padding: 4px 8px 8px;
+}
+
+/* Sub-groups (viewpoint inside owner, or owner inside domain) */
+.org-sub-group {
+  margin: 4px 0;
+}
+
+.org-sub-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-left: 3px solid var(--border);
+}
+
+.org-sub-group-label {
+  flex: 1;
+}
+
+/* Entity row */
+.org-entity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.org-entity-row:hover {
+  background: var(--hover);
+}
+
+.org-entity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.org-entity-name {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.org-kind-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.org-entity-tech {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.org-edit-btn {
+  display: none;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.org-entity-row:hover .org-edit-btn {
+  display: flex;
+}
+
+.org-edit-btn:hover {
+  color: var(--accent);
+  background: var(--hover);
+}
+
+/* Tree hierarchy */
+.org-tree-node {
+  /* padding-left set inline via depth */
+}
+
+.org-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px;
+  border-radius: 4px;
+}
+
+.org-tree-row:hover {
+  background: var(--hover);
+}
+
+.org-tree-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.org-tree-toggle:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+.org-tree-spacer {
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.org-tree-label {
+  cursor: pointer;
+}
+
+.org-tree-label:hover {
+  color: var(--accent);
+}
+
+.org-tree-children {
+  /* children indent handled by parent padding-left */
+}
+
+/* Empty state */
+.org-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.org-empty p {
+  margin: 0;
+  font-size: 13px;
+}

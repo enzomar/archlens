@@ -15,31 +15,27 @@ export const SettingsTab: React.FC = () => {
   const setZoomSensitivity = useStore((s) => s.setZoomSensitivity);
 
   const edgeAnimation = visualConfig.animateEdges !== 'off';
-
-  // Convert 0.01–0.30 to a 1–10 display scale (step 1 ≈ 0.03)
   const sensitivityDisplay = Math.round(zoomSensitivity * 100);
 
   return (
     <>
       {/* ── Autosave ──────────────────────────────────── */}
       <div className="ribbon-group">
-        <div className="ribbon-group-buttons ribbon-group-buttons--col">
+        <div className="ribbon-group-buttons">
           <button
-            className={`ribbon-btn ribbon-btn--wide${autosaveEnabled ? ' ribbon-btn--active' : ''}`}
+            className={`ribbon-btn${autosaveEnabled ? ' ribbon-btn--active' : ''}`}
             onClick={() => setAutosaveEnabled(!autosaveEnabled)}
             title={autosaveEnabled ? 'Disable autosave' : 'Enable autosave'}
             aria-pressed={autosaveEnabled}
           >
             <span className="ribbon-btn-icon">
-              {autosaveEnabled ? <Save size={18} /> : <PauseCircle size={18} />}
+              {autosaveEnabled ? <Save size={20} /> : <PauseCircle size={20} />}
             </span>
             <span className="ribbon-btn-label">
-              Autosave {autosaveEnabled ? 'on' : 'off'}
+              {autosaveEnabled ? 'On' : 'Off'}
             </span>
           </button>
-
           <div className={`ribbon-number-row${!autosaveEnabled ? ' ribbon-number-row--disabled' : ''}`}>
-            <span className="ribbon-num-label">Every</span>
             <input
               type="number"
               className="ribbon-num-input"
@@ -61,7 +57,7 @@ export const SettingsTab: React.FC = () => {
 
       {/* ── Canvas zoom sensitivity ───────────────────── */}
       <div className="ribbon-group">
-        <div className="ribbon-group-buttons ribbon-group-buttons--col">
+        <div className="ribbon-group-buttons">
           <div className="ribbon-slider-row">
             <span className="ribbon-num-label ribbon-slider-icon"><ZoomIn size={13} /></span>
             <input
@@ -77,16 +73,8 @@ export const SettingsTab: React.FC = () => {
             />
             <span className="ribbon-num-label ribbon-num-label--fixed">{sensitivityDisplay}%</span>
           </div>
-          <button
-            className="ribbon-btn ribbon-btn--wide ribbon-btn--ghost"
-            onClick={() => setZoomSensitivity(0.08)}
-            title="Reset zoom sensitivity to default (8%)"
-            disabled={sensitivityDisplay === 8}
-          >
-            <span className="ribbon-btn-label">Reset to default</span>
-          </button>
         </div>
-        <span className="ribbon-group-label">Zoom speed</span>
+        <span className="ribbon-group-label">Zoom</span>
       </div>
 
       <div className="ribbon-separator" />
@@ -106,11 +94,11 @@ export const SettingsTab: React.FC = () => {
               {edgeAnimation ? <Zap size={20} /> : <Play size={20} />}
             </span>
             <span className="ribbon-btn-label">
-              Edges {edgeAnimation ? 'animated' : 'static'}
+              {edgeAnimation ? 'Animated' : 'Static'}
             </span>
           </button>
         </div>
-        <span className="ribbon-group-label">Canvas</span>
+        <span className="ribbon-group-label">Edges</span>
       </div>
     </>
   );

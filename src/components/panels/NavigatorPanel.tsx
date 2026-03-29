@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { KIND_COLORS } from '../../domain/types';
+import { KIND_COLORS, NODE_DIMENSIONS } from '../../domain/types';
 import type { ArchEntity } from '../../domain/types';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 
@@ -16,17 +16,36 @@ const TreeNode: React.FC<TreeNodeProps> = ({ entity, children, allEntities, dept
   const selectedEntityId = useStore((s) => s.selectedEntityId);
   const selectEntity = useStore((s) => s.selectEntity);
   const drillDown = useStore((s) => s.drillDown);
+  const setPan = useStore((s) => s.setPan);
+  const setScale = useStore((s) => s.setScale);
+  const setViewMode = useStore((s) => s.setViewMode);
 
   const hasChildren = children.length > 0;
   const isSelected = selectedEntityId === entity.id;
   const color = KIND_COLORS[entity.kind];
+
+  const handleClick = () => {
+    selectEntity(entity.id);
+    // Switch to architecture view if needed
+    if (useStore.getState().viewMode !== 'architecture') {
+      setViewMode('architecture');
+    }
+    const pos = useStore.getState().positions.find((p) => p.entityId === entity.id);
+    if (pos) {
+      const dims = NODE_DIMENSIONS[entity.kind];
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      setPan(vw / 2 - pos.x - dims.width / 2, vh / 2 - pos.y - dims.height / 2);
+      setScale(1);
+    }
+  };
 
   return (
     <div className="nav-tree-node">
       <button
         className={`nav-tree-item ${isSelected ? 'nav-tree-item--selected' : ''}`}
         style={{ paddingLeft: 8 + depth * 16 }}
-        onClick={() => selectEntity(entity.id)}
+        onClick={handleClick}
         onDoubleClick={() => drillDown(entity.id)}
         title={`${entity.name} [${entity.kind}]`}
       >

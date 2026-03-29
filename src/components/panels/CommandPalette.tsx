@@ -55,7 +55,7 @@ export const CommandPalette: React.FC<{ onClose: () => void }> = ({ onClose }) =
       { id: 'zoom-component', label: 'Zoom: Component',      category: 'navigation', keywords: '3 zoom level', action: () => { useStore.getState().toggleActiveZoomLevel('component'); onClose(); } },
       { id: 'vp-business',    label: 'Viewpoint: Business',    category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('business');    onClose(); } },
       { id: 'vp-application', label: 'Viewpoint: Application', category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('application'); onClose(); } },
-      { id: 'vp-technical',   label: 'Viewpoint: Technical',   category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('technical');   onClose(); } },
+      { id: 'vp-technology',  label: 'Viewpoint: Technology',  category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('technology');  onClose(); } },
     ];
 
     // Entity search items

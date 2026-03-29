@@ -18,6 +18,7 @@ export const createNavigationSlice = (set: StoreSet, get: StoreGet) => ({
       : [...current, level];
     set({ activeZoomLevels: next, zoomLevel: next[next.length - 1], expandedEntityIds: new Set<string>() });
     get().addLogEntry('debug', `Active zoom levels: ${next.join(', ')}`);
+    get().autoLayout();
   },
 
   toggleActiveViewpoint: (vp: Viewpoint) => {
@@ -27,6 +28,7 @@ export const createNavigationSlice = (set: StoreSet, get: StoreGet) => ({
       : [...current, vp];
     set({ activeViewpoints: next, viewpoint: next[next.length - 1], expandedEntityIds: new Set<string>() });
     get().addLogEntry('debug', `Active viewpoints: ${next.join(', ')}`);
+    get().autoLayout();
   },
 
   setZoomLevel: (level: ZoomLevel) => {

@@ -1,6 +1,21 @@
 // ─── CORE ENUMERATIONS ───────────────────────────────────────────
 
-export type EntityKind = 'person' | 'system' | 'container' | 'component' | 'artifact' | 'trigger' | 'aimodel' | 'vectorstore' | 'retriever' | 'evaluation';
+export type EntityKind =
+  // C4 core
+  | 'person' | 'system' | 'container' | 'component' | 'artifact' | 'trigger'
+  // AI / ML
+  | 'aimodel' | 'vectorstore' | 'retriever' | 'evaluation'
+  // ArchiMate — Business Layer
+  | 'business-actor' | 'business-role' | 'business-process' | 'business-service'
+  | 'business-object' | 'business-event' | 'business-interface' | 'contract'
+  // ArchiMate — Application Layer
+  | 'application-component' | 'application-service' | 'application-function'
+  | 'application-interface' | 'application-process' | 'data-object'
+  // ArchiMate — Technology Layer
+  | 'node' | 'device' | 'system-software' | 'technology-service'
+  | 'communication-network' | 'technology-interface'
+  // ArchiMate — Strategy / Motivation
+  | 'capability' | 'stakeholder' | 'goal' | 'requirement';
 
 export type Maturity = 'INTRO' | 'GROW' | 'MATURE' | 'DECLINE' | 'DEV';
 
@@ -22,16 +37,18 @@ export type EdgeType = 'sync' | 'async' | 'dataflow' | 'dependency' | 'trigger' 
 
 // ─── VIEWPOINTS ──────────────────────────────────────────────────
 
-export type Viewpoint = 'business' | 'application' | 'technical' | 'global';
+export type Viewpoint = 'business' | 'application' | 'technology' | 'global';
 
-export const ALL_VIEWPOINTS: Viewpoint[] = ['business', 'application', 'technical', 'global'];
+export const ALL_VIEWPOINTS: Viewpoint[] = ['business', 'application', 'technology', 'global'];
 
 /** The three concrete viewpoints (excludes the synthetic 'global' aggregate). */
-export const CONCRETE_VIEWPOINTS: Viewpoint[] = ['business', 'application', 'technical'];
+export const CONCRETE_VIEWPOINTS: Viewpoint[] = ['business', 'application', 'technology'];
 
 export type ZoomLevel = 'context' | 'container' | 'component' | 'code';
 
 export type DiagramMode = 'focused' | 'inclusive' | 'full';
+
+export type ViewMode = 'architecture' | 'list' | 'analysis' | 'organization';
 
 // ─── ENUM ARRAYS ─────────────────────────────────────────────────
 
@@ -42,7 +59,23 @@ export const ALL_PREDEFINED_TAGS: PredefinedTag[] = [
   'BigData', 'ML', 'FastData', 'PII',
 ];
 
-export const ALL_ENTITY_KINDS: EntityKind[] = ['person', 'system', 'container', 'component', 'artifact', 'trigger', 'aimodel', 'vectorstore', 'retriever', 'evaluation'];
+export const ALL_ENTITY_KINDS: EntityKind[] = [
+  // C4 core
+  'person', 'system', 'container', 'component', 'artifact', 'trigger',
+  // AI / ML
+  'aimodel', 'vectorstore', 'retriever', 'evaluation',
+  // ArchiMate — Business
+  'business-actor', 'business-role', 'business-process', 'business-service',
+  'business-object', 'business-event', 'business-interface', 'contract',
+  // ArchiMate — Application
+  'application-component', 'application-service', 'application-function',
+  'application-interface', 'application-process', 'data-object',
+  // ArchiMate — Technology
+  'node', 'device', 'system-software', 'technology-service',
+  'communication-network', 'technology-interface',
+  // ArchiMate — Strategy / Motivation
+  'capability', 'stakeholder', 'goal', 'requirement',
+];
 export const ALL_MATURITIES: Maturity[] = ['INTRO', 'GROW', 'MATURE', 'DECLINE', 'DEV'];
 export const ALL_TSHIRT_SIZES: TShirtSize[] = ['S', 'M', 'L', 'XL'];
 export const ALL_APP_TYPES: AppType[] = ['CNQ', 'OBE', 'WEB', 'FaaS', 'Other'];
@@ -225,10 +258,13 @@ export type EdgeAnimationMode = 'off' | 'on' | 'dynamic';
 
 export type NodeDisplayMode = 'standard' | 'extended';
 
+export type EdgeRoutingMode = 'ORTHOGONAL' | 'POLYLINE' | 'SPLINES';
+
 export interface VisualConfig {
   colorBy: 'kind' | 'maturity' | 'viewpoint';
   animateEdges: EdgeAnimationMode;
   nodeDisplayMode: NodeDisplayMode;
+  edgeRouting: EdgeRoutingMode;
   showGrid: boolean;
   snapToGrid: boolean;
 }

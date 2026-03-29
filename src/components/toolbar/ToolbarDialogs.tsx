@@ -55,11 +55,40 @@ export const ToolbarDialogs: React.FC<ToolbarDialogsProps> = ({
             </div>
             <div className="help-content">
               <h3>Keyboard Shortcuts</h3>
+
+              <h4 className="help-shortcut-group">Canvas</h4>
               <div className="help-shortcuts">
-                <div className="help-shortcut"><kbd>Scroll</kbd> <span>Zoom in/out</span></div>
-                <div className="help-shortcut"><kbd>Click + Drag</kbd> <span>Pan canvas</span></div>
+                <div className="help-shortcut"><kbd>Scroll</kbd> <span>Zoom in / out</span></div>
+                <div className="help-shortcut"><kbd>Space + Drag</kbd> <span>Pan canvas</span></div>
+                <div className="help-shortcut"><kbd>Click + Drag</kbd> <span>Pan canvas (background)</span></div>
                 <div className="help-shortcut"><kbd>Double-click</kbd> <span>Drill into entity</span></div>
-                <div className="help-shortcut"><kbd>Escape</kbd> <span>Close dialog</span></div>
+                <div className="help-shortcut"><kbd>Delete / Backspace</kbd> <span>Delete selected</span></div>
+              </div>
+
+              <h4 className="help-shortcut-group">Navigation</h4>
+              <div className="help-shortcuts">
+                <div className="help-shortcut"><kbd>1</kbd> <span>Select System Context level</span></div>
+                <div className="help-shortcut"><kbd>2</kbd> <span>Select Container level</span></div>
+                <div className="help-shortcut"><kbd>3</kbd> <span>Select Component level</span></div>
+                <div className="help-shortcut"><kbd>Shift 1/2/3</kbd> <span>Add level to multi-view</span></div>
+                <div className="help-shortcut"><kbd>B</kbd> <span>Select Business viewpoint</span></div>
+                <div className="help-shortcut"><kbd>A</kbd> <span>Select Application viewpoint</span></div>
+                <div className="help-shortcut"><kbd>T</kbd> <span>Select Technology viewpoint</span></div>
+                <div className="help-shortcut"><kbd>Shift B/A/T</kbd> <span>Add viewpoint to multi-view</span></div>
+                <div className="help-shortcut"><kbd>Escape</kbd> <span>Close dialog / exit immersive</span></div>
+              </div>
+
+              <h4 className="help-shortcut-group">Editing</h4>
+              <div className="help-shortcuts">
+                <div className="help-shortcut"><kbd>N</kbd> <span>New entity</span></div>
+                <div className="help-shortcut"><kbd>Ctrl Z</kbd> <span>Undo</span></div>
+                <div className="help-shortcut"><kbd>Ctrl Y</kbd> <span>Redo</span></div>
+                <div className="help-shortcut"><kbd>Ctrl S</kbd> <span>Save / export project</span></div>
+                <div className="help-shortcut"><kbd>Ctrl Shift P</kbd> <span>Command palette</span></div>
+              </div>
+
+              <h4 className="help-shortcut-group">Modes</h4>
+              <div className="help-shortcuts">
                 <div className="help-shortcut"><kbd>F5</kbd> <span>Presentation mode</span></div>
                 <div className="help-shortcut"><kbd>F11</kbd> <span>Distraction-free mode</span></div>
               </div>

@@ -21,7 +21,7 @@ interface Props {
 type Step = 'intent' | 'scope' | 'refine' | 'result';
 
 interface Answers {
-  intent?: 'business' | 'application' | 'technical';
+  intent?: 'business' | 'application' | 'technology';
   scope?:  'context' | 'container' | 'component';
   refine?: 'independent' | 'part-of' | 'external';
 }
@@ -44,11 +44,11 @@ const INTENT_OPTIONS = [
     badge: 'Application',
   },
   {
-    id:    'technical' as const,
+    id:    'technology' as const,
     Icon:  Database,
-    title: 'Technical element',
+    title: 'Technology element',
     desc:  'Database, infrastructure, messaging bus or platform service',
-    badge: 'Technical',
+    badge: 'Technology',
   },
 ];
 
@@ -111,9 +111,9 @@ function computeResult(answers: Required<Pick<Answers, 'intent' | 'scope'>> & Pi
     application_context:       'system',
     application_container:     'container',
     application_component:     'component',
-    technical_context:         'system',
-    technical_container:       'container',
-    technical_component:       'component',
+    technology_context:         'system',
+    technology_container:       'container',
+    technology_component:       'component',
   };
 
   const zoomMap: Record<string, ZoomLevel> = {
@@ -140,7 +140,7 @@ const KIND_LABEL: Record<string, string> = {
 const VIEWPOINT_LABEL: Record<string, string> = {
   business:    'Business',
   application: 'Application',
-  technical:   'Technical',
+  technology: 'Technology',
 };
 
 const KIND_EXPLANATION: Record<string, string> = {

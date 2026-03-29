@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ArchEntity, Relationship, DiagramNote, DiagramBoundary, NodePosition } from '../../domain/core';
+import { KIND_TO_ZOOM } from '../../domain/matrix';
 
 // ─── Target union ────────────────────────────────────────────────
 
@@ -60,8 +61,8 @@ export const InspectOverlay: React.FC<Props> = ({ target, mouseX, mouseY }) => {
         {entity.identificationId && <Row label="Ext ID" value={entity.identificationId} />}
         {entity.shortName && <Row label="Short" value={entity.shortName} />}
         <Section title="Placement" />
+        <Row label="C4 Level" value={KIND_TO_ZOOM[entity.kind]} />
         <Row label="Viewpoint" value={entity.viewpoint} />
-        {entity.zoomLevel && <Row label="Zoom level" value={entity.zoomLevel} />}
         {entity.parentId && <Row label="Parent ID" value={<code className="inspect-code">{entity.parentId.slice(0, 8)}…</code>} />}
         <Row label="Position" value={`(${Math.round(position.x)}, ${Math.round(position.y)})`} />
         {position.locked && <Row label="Locked" value="yes" />}

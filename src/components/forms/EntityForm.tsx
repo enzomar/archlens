@@ -238,8 +238,17 @@ export const EntityForm: React.FC = () => {
     if (!shortName.trim()) errs.push('Short Name is required');
     if (kind === 'component' && !parentId) errs.push('Components must have a parent container');
     setErrors(errs);
+    if (errs.length > 0) {
+      // Auto-switch to the first tab that has errors
+      const identityErrors = ['Name is required', 'Short Name is required', 'Components must have a parent container'];
+      if (errs.some((e) => identityErrors.includes(e))) setActiveTab('identity');
+    }
     return errs.length === 0;
   }
+
+  // Map errors to tabs for badge display
+  const IDENTITY_ERRORS = new Set(['Name is required', 'Short Name is required', 'Components must have a parent container']);
+  const identityErrorCount = errors.filter((e) => IDENTITY_ERRORS.has(e)).length;
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -365,28 +374,52 @@ export const EntityForm: React.FC = () => {
 
   if (!showForm) return null;
 
+  // -- C4 parent rules --
+  const CONTAINER_LEVEL_KINDS = new Set([
+    'container', 'aimodel', 'vectorstore',
+    'business-process', 'business-service',
+    'application-component', 'application-service', 'application-process',
+    'node', 'device', 'system-software', 'technology-service', 'communication-network',
+  ]);
+  const CONTEXT_LEVEL_KINDS = new Set([
+    'person', 'system',
+    'business-actor', 'business-role', 'business-event',
+    'capability', 'stakeholder', 'goal',
+  ]);
+
   const potentialParents = entities.filter((e) => {
+    // C4 core hierarchy
     if (kind === 'container') return e.kind === 'system';
-    if (kind === 'component') return e.kind === 'container';
+    if (kind === 'component') return e.kind === 'container' || e.kind === 'application-component';
     if (kind === 'artifact') return e.kind === 'container' || e.kind === 'component';
     if (kind === 'aimodel') return e.kind === 'system' || e.kind === 'container';
     if (kind === 'vectorstore') return e.kind === 'system' || e.kind === 'container';
     if (kind === 'retriever') return e.kind === 'container' || e.kind === 'aimodel';
     if (kind === 'evaluation') return e.kind === 'container' || e.kind === 'aimodel';
+    // ArchiMate container-level → parent is context-level
+    if (CONTAINER_LEVEL_KINDS.has(kind)) return CONTEXT_LEVEL_KINDS.has(e.kind) || e.kind === 'system';
+    // ArchiMate component-level → parent is container-level
+    if (['business-object', 'business-interface', 'contract',
+         'application-function', 'application-interface', 'data-object',
+         'technology-interface', 'requirement'].includes(kind)) {
+      return CONTAINER_LEVEL_KINDS.has(e.kind);
+    }
     return false;
   });
 
-  const showParent = ['container', 'component', 'artifact', 'aimodel', 'vectorstore', 'retriever', 'evaluation'].includes(kind);
-  const showAppType = ['container', 'system'].includes(kind);
-  const showDeployment = ['container', 'system', 'vectorstore'].includes(kind);
+  const showParent = !CONTEXT_LEVEL_KINDS.has(kind) && kind !== 'trigger';
+  const showAppType = ['container', 'system', 'application-component', 'node'].includes(kind);
+  const showDeployment = ['container', 'system', 'vectorstore', 'node', 'device', 'system-software'].includes(kind);
 
   // ── Kind-adaptive field visibility ──────────────────────────────
-  const isSoftware = ['system', 'container', 'component', 'aimodel', 'vectorstore', 'retriever', 'evaluation'].includes(kind);
+  const isSoftware = ['system', 'container', 'component', 'aimodel', 'vectorstore', 'retriever', 'evaluation',
+    'application-component', 'application-service', 'application-function', 'application-interface', 'application-process', 'data-object',
+    'node', 'device', 'system-software', 'technology-service', 'communication-network', 'technology-interface'].includes(kind);
   const showResponsibilities = kind !== 'artifact' && kind !== 'trigger';
   const showMaturitySize = isSoftware;
   const showTechFields = isSoftware;               // technology, techConvergency
   const showTpsCompute = isSoftware;
-  const showCodeRepo = ['container', 'component'].includes(kind);
+  const showCodeRepo = ['container', 'component', 'application-component', 'application-function'].includes(kind);
   const showCompliance = isSoftware;                // PII, PCI-DSS
   const showOwner = kind !== 'artifact' && kind !== 'trigger';
   const showRelationships = kind !== 'artifact';
@@ -456,10 +489,11 @@ export const EntityForm: React.FC = () => {
               type="button"
               role="tab"
               aria-selected={activeTab === 'identity'}
-              className={`ef-tab-btn${activeTab === 'identity' ? ' active' : ''}`}
+              className={`ef-tab-btn${activeTab === 'identity' ? ' active' : ''}${identityErrorCount > 0 ? ' ef-tab-btn--error' : ''}`}
               onClick={() => setActiveTab('identity')}
             >
               Identity
+              {identityErrorCount > 0 && <span className="ef-tab-badge ef-tab-badge--error">{identityErrorCount}</span>}
             </button>
             <button
               type="button"

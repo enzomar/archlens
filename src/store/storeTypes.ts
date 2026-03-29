@@ -5,6 +5,7 @@ import type {
   SavedView,
   ZoomLevel,
   DiagramMode,
+  ViewMode,
   Viewpoint,
   ViewFilters,
   VisualConfig,
@@ -18,6 +19,7 @@ import type {
   TraceabilityType,
   ArchLensProject,
 } from '../domain/types';
+import type { LayoutResult, LayoutMode } from '../layout/types';
 
 // ─── LOG ENTRY ───────────────────────────────────────────────────
 
@@ -34,6 +36,7 @@ export const DEFAULT_VISUAL_CONFIG: VisualConfig = {
   colorBy: 'kind',
   animateEdges: 'on',
   nodeDisplayMode: 'standard',
+  edgeRouting: 'ORTHOGONAL',
   showGrid: true,
   snapToGrid: false,
 };
@@ -87,6 +90,13 @@ export interface ArchLensState {
 
   // UI mode
   uiMode: 'normal' | 'distraction-free' | 'presentation';
+
+  // Layout result cache (for table grid rendering)
+  lastLayoutResult: LayoutResult | null;
+
+  // Swimlane orientation
+  swimlaneOrientation: LayoutMode;
+  setSwimlaneOrientation: (o: LayoutMode) => void;
 
   // Tabs
   tabs: DiagramTab[];
@@ -169,7 +179,7 @@ export interface ArchLensState {
 
   manualLayout: boolean;
   setManualLayout: (manual: boolean) => void;
-  autoLayout: () => void;
+  autoLayout: () => Promise<void>;
 
   selectedNoteId: string | null;
   selectedBoundaryId: string | null;
@@ -183,8 +193,8 @@ export interface ArchLensState {
   setShowNoteForm: (show: boolean, editId?: string | null) => void;
   setShowBoundaryForm: (show: boolean, editId?: string | null) => void;
 
-  showListView: boolean;
-  toggleListView: () => void;
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
   duplicateEntity: (id: string) => string | null;
 
   loadProject: (project: ArchLensProject) => void;

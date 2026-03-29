@@ -55,15 +55,8 @@ export const DetailPanel: React.FC = () => {
           {entity.shortName && <span className="detail-shortname">({entity.shortName})</span>}
         </div>
 
-        {/* UUID + Identification ID */}
+        {/* Identification ID + UUID */}
         <div className="detail-section detail-ids">
-          <div className="detail-uuid-row">
-            <label>UUID</label>
-            <code className="detail-uuid">{entity.id}</code>
-            <button className="btn-icon" onClick={() => navigator.clipboard.writeText(entity.id)} aria-label="Copy UUID" title="Copy UUID">
-              <Copy size={12} />
-            </button>
-          </div>
           {entity.identificationId && (
             <div className="meta-item">
               <label>ID</label>
@@ -76,6 +69,15 @@ export const DetailPanel: React.FC = () => {
               <span>{entity.parentName}</span>
             </div>
           )}
+          <details className="detail-uuid-details">
+            <summary className="detail-uuid-summary">UUID</summary>
+            <div className="detail-uuid-row">
+              <code className="detail-uuid">{entity.id}</code>
+              <button className="btn-icon" onClick={() => navigator.clipboard.writeText(entity.id)} aria-label="Copy UUID" title="Copy UUID">
+                <Copy size={12} />
+              </button>
+            </div>
+          </details>
         </div>
 
         {/* Compliance badges */}

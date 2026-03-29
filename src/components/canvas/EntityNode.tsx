@@ -16,33 +16,26 @@ interface EntityNodeProps {
 }
 
 const SHAPE_RENDERERS: Record<EntityKind, (w: number, h: number) => React.ReactNode> = {
-  // C4 Person: rounded rectangle with person silhouette icon at top
+  // ── C4 core ────────────────────────────────────────────────
   person: (w, h) => (
     <>
-      {/* Head circle above the box */}
       <circle cx={w / 2} cy={-14} r={16} fill="currentColor" opacity={0.20} stroke="currentColor" strokeWidth={2} />
-      {/* Body box */}
       <rect x={0} y={0} width={w} height={h} rx={8} ry={8} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={2} />
     </>
   ),
-  // C4 Software System: large rounded rectangle, heavier border
   system: (w, h) => (
     <rect x={0} y={0} width={w} height={h} rx={8} ry={8} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={2.5} />
   ),
-  // C4 Container: rounded rectangle
   container: (w, h) => (
     <rect x={0} y={0} width={w} height={h} rx={6} ry={6} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
   ),
-  // C4 Component: rectangle with UML-style component tabs on left side
   component: (w, h) => (
     <>
       <rect x={0} y={0} width={w} height={h} rx={4} ry={4} fill="currentColor" opacity={0.08} stroke="currentColor" strokeWidth={1.5} />
-      {/* UML component tabs */}
       <rect x={-8} y={14} width={16} height={8} rx={1} fill="currentColor" opacity={0.15} stroke="currentColor" strokeWidth={1} />
       <rect x={-8} y={28} width={16} height={8} rx={1} fill="currentColor" opacity={0.15} stroke="currentColor" strokeWidth={1} />
     </>
   ),
-  // Artifact: document shape with folded corner
   artifact: (w, h) => {
     const fold = 16;
     return (
@@ -52,23 +45,21 @@ const SHAPE_RENDERERS: Record<EntityKind, (w: number, h: number) => React.ReactN
       />
     );
   },
-  // Trigger: lightning bolt
   trigger: (w, h) => (
     <polygon
       points={`${w / 2},0 ${w},${h * 0.4} ${w * 0.6},${h * 0.4} ${w * 0.7},${h} ${0},${h * 0.6} ${w * 0.4},${h * 0.6}`}
       fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={2}
     />
   ),
-  // AI Model: rounded rectangle with sparkle/brain icon
+
+  // ── AI / ML ────────────────────────────────────────────────
   aimodel: (w, h) => (
     <>
       <rect x={0} y={0} width={w} height={h} rx={10} ry={10} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2.5} />
-      {/* Sparkle icon */}
       <path d={`M${w - 22},8 L${w - 19},14 L${w - 13},14 L${w - 18},18 L${w - 16},24 L${w - 22},20 L${w - 28},24 L${w - 26},18 L${w - 31},14 L${w - 25},14 Z`}
         fill="currentColor" opacity={0.35} />
     </>
   ),
-  // Vector Store: cylinder shape (database-like)
   vectorstore: (w, h) => {
     const ry = 14;
     return (
@@ -76,44 +67,251 @@ const SHAPE_RENDERERS: Record<EntityKind, (w: number, h: number) => React.ReactN
         <path d={`M0,${ry} L0,${h - ry} Q0,${h} ${w / 2},${h} Q${w},${h} ${w},${h - ry} L${w},${ry}`}
           fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
         <ellipse cx={w / 2} cy={ry} rx={w / 2} ry={ry} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
-        {/* Vector grid lines */}
         <line x1={w * 0.25} y1={ry + 10} x2={w * 0.25} y2={h - ry - 4} stroke="currentColor" strokeWidth={0.7} opacity={0.2} />
         <line x1={w * 0.5} y1={ry + 10} x2={w * 0.5} y2={h - ry - 4} stroke="currentColor" strokeWidth={0.7} opacity={0.2} />
         <line x1={w * 0.75} y1={ry + 10} x2={w * 0.75} y2={h - ry - 4} stroke="currentColor" strokeWidth={0.7} opacity={0.2} />
       </>
     );
   },
-  // Retriever: rounded rectangle with search lens
   retriever: (w, h) => (
     <>
       <rect x={0} y={0} width={w} height={h} rx={6} ry={6} fill="currentColor" opacity={0.08} stroke="currentColor" strokeWidth={1.5} />
-      {/* Magnifying glass icon */}
       <circle cx={w - 22} cy={14} r={6} fill="none" stroke="currentColor" strokeWidth={1.5} opacity={0.3} />
       <line x1={w - 18} y1={18} x2={w - 14} y2={22} stroke="currentColor" strokeWidth={1.5} opacity={0.3} />
     </>
   ),
-  // Evaluation: rounded rectangle with checkmark/scale
   evaluation: (w, h) => (
     <>
       <rect x={0} y={0} width={w} height={h} rx={6} ry={6} fill="currentColor" opacity={0.08} stroke="currentColor" strokeWidth={1.5} strokeDasharray="6 2" />
-      {/* Scale/gauge icon */}
       <circle cx={w - 20} cy={14} r={7} fill="none" stroke="currentColor" strokeWidth={1.2} opacity={0.3} />
       <line x1={w - 20} y1={14} x2={w - 16} y2={10} stroke="currentColor" strokeWidth={1.2} opacity={0.35} />
+    </>
+  ),
+
+  // ── ArchiMate — Business Layer ─────────────────────────────
+  'business-actor': (w, h) => (
+    <>
+      <circle cx={w / 2} cy={-12} r={14} fill="currentColor" opacity={0.18} stroke="currentColor" strokeWidth={1.8} />
+      <rect x={0} y={0} width={w} height={h} rx={6} ry={6} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+    </>
+  ),
+  'business-role': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={6} ry={6} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+      {/* Role marker — small circle top-right */}
+      <circle cx={w - 12} cy={12} r={6} fill="currentColor" opacity={0.25} stroke="currentColor" strokeWidth={1.2} />
+    </>
+  ),
+  'business-process': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={10} ry={10} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+      {/* Arrow marker — top-right */}
+      <polygon points={`${w - 20},6 ${w - 8},14 ${w - 20},22`} fill="currentColor" opacity={0.30} />
+    </>
+  ),
+  'business-service': (w, h) => (
+    <>
+      {/* Rounded-top rectangle (ArchiMate service) */}
+      <path d={`M0,${h * 0.15} Q0,0 ${w * 0.15},0 L${w * 0.85},0 Q${w},0 ${w},${h * 0.15} L${w},${h} L0,${h} Z`}
+        fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+    </>
+  ),
+  'business-object': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={2} ry={2} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={0} y1={18} x2={w} y2={18} stroke="currentColor" strokeWidth={1} opacity={0.25} />
+    </>
+  ),
+  'business-event': (w, h) => (
+    <>
+      {/* Event shape — notched left side */}
+      <path d={`M${h * 0.15},0 L${w},0 L${w},${h} L${h * 0.15},${h} Q0,${h / 2} ${h * 0.15},0 Z`}
+        fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+    </>
+  ),
+  'business-interface': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={4} ry={4} fill="currentColor" opacity={0.08} stroke="currentColor" strokeWidth={1.5} />
+      {/* Interface lollipop */}
+      <circle cx={-6} cy={h / 2} r={6} fill="currentColor" opacity={0.20} stroke="currentColor" strokeWidth={1.2} />
+      <line x1={0} y1={h / 2} x2={-12} y2={h / 2} stroke="currentColor" strokeWidth={1.2} opacity={0.25} />
+    </>
+  ),
+  contract: (w, h) => {
+    const fold = 14;
+    return (
+      <>
+        <path
+          d={`M0,0 L${w - fold},0 L${w},${fold} L${w},${h} L0,${h} Z M${w - fold},0 L${w - fold},${fold} L${w},${fold}`}
+          fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={1.5}
+        />
+        {/* Signature lines */}
+        <line x1={w * 0.2} y1={h - 22} x2={w * 0.8} y2={h - 22} stroke="currentColor" strokeWidth={0.8} opacity={0.25} />
+        <line x1={w * 0.2} y1={h - 14} x2={w * 0.6} y2={h - 14} stroke="currentColor" strokeWidth={0.8} opacity={0.20} />
+      </>
+    );
+  },
+
+  // ── ArchiMate — Application Layer ──────────────────────────
+  'application-component': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={4} ry={4} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+      {/* ArchiMate component tabs on left */}
+      <rect x={-8} y={14} width={16} height={8} rx={1} fill="currentColor" opacity={0.18} stroke="currentColor" strokeWidth={1} />
+      <rect x={-8} y={28} width={16} height={8} rx={1} fill="currentColor" opacity={0.18} stroke="currentColor" strokeWidth={1} />
+    </>
+  ),
+  'application-service': (w, h) => (
+    <path d={`M0,${h * 0.15} Q0,0 ${w * 0.15},0 L${w * 0.85},0 Q${w},0 ${w},${h * 0.15} L${w},${h} L0,${h} Z`}
+      fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+  ),
+  'application-function': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={8} ry={8} fill="currentColor" opacity={0.08} stroke="currentColor" strokeWidth={1.5} />
+      {/* Gear marker */}
+      <circle cx={w - 16} cy={14} r={6} fill="none" stroke="currentColor" strokeWidth={1.2} opacity={0.3} />
+      <circle cx={w - 16} cy={14} r={2} fill="currentColor" opacity={0.3} />
+    </>
+  ),
+  'application-interface': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={4} ry={4} fill="currentColor" opacity={0.08} stroke="currentColor" strokeWidth={1.5} />
+      <circle cx={-6} cy={h / 2} r={6} fill="currentColor" opacity={0.20} stroke="currentColor" strokeWidth={1.2} />
+      <line x1={0} y1={h / 2} x2={-12} y2={h / 2} stroke="currentColor" strokeWidth={1.2} opacity={0.25} />
+    </>
+  ),
+  'application-process': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={10} ry={10} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+      <polygon points={`${w - 20},6 ${w - 8},14 ${w - 20},22`} fill="currentColor" opacity={0.30} />
+    </>
+  ),
+  'data-object': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={2} ry={2} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={0} y1={18} x2={w} y2={18} stroke="currentColor" strokeWidth={1} opacity={0.25} />
+    </>
+  ),
+
+  // ── ArchiMate — Technology Layer ───────────────────────────
+  node: (w, h) => {
+    const d = 16; // 3D depth
+    return (
+      <>
+        {/* Front face */}
+        <rect x={0} y={d} width={w - d} height={h - d} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+        {/* Top face */}
+        <polygon points={`0,${d} ${d},0 ${w},0 ${w - d},${d}`} fill="currentColor" opacity={0.06} stroke="currentColor" strokeWidth={1.5} />
+        {/* Right face */}
+        <polygon points={`${w - d},${d} ${w},0 ${w},${h - d} ${w - d},${h}`} fill="currentColor" opacity={0.04} stroke="currentColor" strokeWidth={1.5} />
+      </>
+    );
+  },
+  device: (w, h) => {
+    const d = 14;
+    return (
+      <>
+        <rect x={0} y={d} width={w - d} height={h - d} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+        <polygon points={`0,${d} ${d},0 ${w},0 ${w - d},${d}`} fill="currentColor" opacity={0.06} stroke="currentColor" strokeWidth={1.5} />
+        <polygon points={`${w - d},${d} ${w},0 ${w},${h - d} ${w - d},${h}`} fill="currentColor" opacity={0.04} stroke="currentColor" strokeWidth={1.5} />
+        {/* Device base bar */}
+        <rect x={w * 0.1} y={h - 6} width={w * 0.65} height={4} rx={1} fill="currentColor" opacity={0.20} />
+      </>
+    );
+  },
+  'system-software': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={6} ry={6} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+      {/* Circle marker (cog) top-right */}
+      <circle cx={w - 14} cy={14} r={7} fill="none" stroke="currentColor" strokeWidth={1.3} opacity={0.3} />
+      <circle cx={w - 14} cy={14} r={2.5} fill="currentColor" opacity={0.3} />
+    </>
+  ),
+  'technology-service': (w, h) => (
+    <path d={`M0,${h * 0.15} Q0,0 ${w * 0.15},0 L${w * 0.85},0 Q${w},0 ${w},${h * 0.15} L${w},${h} L0,${h} Z`}
+      fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+  ),
+  'communication-network': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={6} ry={6} fill="currentColor" opacity={0.08} stroke="currentColor" strokeWidth={1.5} />
+      {/* Network line with dots */}
+      <line x1={16} y1={h - 16} x2={w - 16} y2={h - 16} stroke="currentColor" strokeWidth={1.5} opacity={0.3} />
+      <circle cx={16} cy={h - 16} r={3} fill="currentColor" opacity={0.35} />
+      <circle cx={w / 2} cy={h - 16} r={3} fill="currentColor" opacity={0.35} />
+      <circle cx={w - 16} cy={h - 16} r={3} fill="currentColor" opacity={0.35} />
+    </>
+  ),
+  'technology-interface': (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={4} ry={4} fill="currentColor" opacity={0.08} stroke="currentColor" strokeWidth={1.5} />
+      <circle cx={-6} cy={h / 2} r={6} fill="currentColor" opacity={0.20} stroke="currentColor" strokeWidth={1.2} />
+      <line x1={0} y1={h / 2} x2={-12} y2={h / 2} stroke="currentColor" strokeWidth={1.2} opacity={0.25} />
+    </>
+  ),
+
+  // ── ArchiMate — Strategy / Motivation ──────────────────────
+  capability: (w, h) => (
+    <rect x={0} y={0} width={w} height={h} rx={14} ry={14} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+  ),
+  stakeholder: (w, h) => (
+    <>
+      <circle cx={w / 2} cy={-12} r={14} fill="currentColor" opacity={0.18} stroke="currentColor" strokeWidth={1.8} />
+      <rect x={0} y={0} width={w} height={h} rx={8} ry={8} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+    </>
+  ),
+  goal: (w, h) => (
+    <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2} fill="currentColor" opacity={0.10} stroke="currentColor" strokeWidth={2} />
+  ),
+  requirement: (w, h) => (
+    <>
+      <rect x={0} y={0} width={w} height={h} rx={4} ry={4} fill="currentColor" opacity={0.08} stroke="currentColor" strokeWidth={1.5} />
+      {/* Check mark */}
+      <polyline points={`${w - 24},12 ${w - 18},18 ${w - 10},8`} fill="none" stroke="currentColor" strokeWidth={1.5} opacity={0.35} />
     </>
   ),
 };
 
 const KIND_LABEL: Record<EntityKind, string> = {
+  // C4 core
   person: 'Person',
   system: 'Software System',
   container: 'Container',
   component: 'Component',
   artifact: 'Artifact',
   trigger: 'Trigger',
+  // AI / ML
   aimodel: 'AI Model',
   vectorstore: 'Vector Store',
   retriever: 'Retriever',
   evaluation: 'Evaluation',
+  // ArchiMate — Business
+  'business-actor': 'Business Actor',
+  'business-role': 'Business Role',
+  'business-process': 'Business Process',
+  'business-service': 'Business Service',
+  'business-object': 'Business Object',
+  'business-event': 'Business Event',
+  'business-interface': 'Business Interface',
+  contract: 'Contract',
+  // ArchiMate — Application
+  'application-component': 'App Component',
+  'application-service': 'App Service',
+  'application-function': 'App Function',
+  'application-interface': 'App Interface',
+  'application-process': 'App Process',
+  'data-object': 'Data Object',
+  // ArchiMate — Technology
+  node: 'Node',
+  device: 'Device',
+  'system-software': 'System Software',
+  'technology-service': 'Tech Service',
+  'communication-network': 'Network',
+  'technology-interface': 'Tech Interface',
+  // ArchiMate — Strategy / Motivation
+  capability: 'Capability',
+  stakeholder: 'Stakeholder',
+  goal: 'Goal',
+  requirement: 'Requirement',
 };
 
 /* ─── Standard C4 Node ────────────────────────────────────── */
@@ -121,10 +319,11 @@ const KIND_LABEL: Record<EntityKind, string> = {
 const StandardNode: React.FC<{ entity: ArchEntity; dims: { width: number; height: number }; color: string; drillable: boolean }> = ({
   entity, dims, color, drillable,
 }) => {
-  // C4 type label: [Kind] or [Kind: Technology] for container/component
+  // Type label: [Kind] or [Kind: Technology] for software elements
   const tech = entity.metadata.technology;
   const kindStr = KIND_LABEL[entity.kind];
-  const typeLabel = (entity.kind === 'container' || entity.kind === 'component') && tech
+  const showTech = tech && !['person', 'trigger', 'business-actor', 'business-role', 'business-event', 'business-object', 'contract', 'stakeholder', 'goal', 'capability', 'requirement'].includes(entity.kind);
+  const typeLabel = showTech
     ? `[${kindStr}: ${tech}]`
     : `[${kindStr}]`;
 
@@ -313,11 +512,17 @@ export const EntityNode: React.FC<EntityNodeProps> = ({
   const [borderHover, setBorderHover] = useState(false);
   const isExtended = visualConfig.nodeDisplayMode === 'extended';
   const dims = isExtended ? NODE_DIMENSIONS_EXTENDED[entity.kind] : NODE_DIMENSIONS[entity.kind];
-  const color = visualConfig.colorBy === 'viewpoint'
+
+  // ArchiMate viewpoint always drives the border color
+  const borderColor = VIEWPOINT_COLORS[entity.viewpoint];
+  // Interior accent follows user colorBy preference
+  const accentColor = visualConfig.colorBy === 'viewpoint'
     ? VIEWPOINT_COLORS[entity.viewpoint]
     : visualConfig.colorBy === 'kind'
       ? KIND_COLORS[entity.kind]
       : (entity.metadata.maturity ? MATURITY_COLORS[entity.metadata.maturity] : KIND_COLORS[entity.kind]);
+  // For the SVG group (shapes use currentColor for stroke) → always viewpoint border
+  const color = borderColor;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -359,8 +564,8 @@ export const EntityNode: React.FC<EntityNodeProps> = ({
       )}
 
       {isExtended
-        ? <ExtendedNode entity={entity} dims={dims} color={color} drillable={drillable} />
-        : <StandardNode entity={entity} dims={dims} color={color} drillable={drillable} />
+        ? <ExtendedNode entity={entity} dims={dims} color={accentColor} drillable={drillable} />
+        : <StandardNode entity={entity} dims={dims} color={accentColor} drillable={drillable} />
       }
 
       {/* ── Connect-target highlight (shown when dragging an edge onto this node) */}

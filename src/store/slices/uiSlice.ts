@@ -1,7 +1,8 @@
 import { v4 as uuid } from 'uuid';
 import type { ViewFilters, VisualConfig, ThemeMode, NodePosition } from '../../domain/types';
 import { NODE_DIMENSIONS } from '../../domain/types';
-import { computeLayout } from '../../layout/layoutEngine';
+import { computeElkLayout } from '../../layout/elkLayout';
+import type { LayoutResult, LayoutMode } from '../../layout/types';
 import type { StoreSet, StoreGet, LogEntry } from '../storeTypes';
 import { DEFAULT_VISUAL_CONFIG } from '../storeTypes';
 
@@ -47,6 +48,14 @@ export const createUiSlice = (set: StoreSet, get: StoreGet) => ({
   editingNoteId: null as string | null,
   showBoundaryForm: false,
   editingBoundaryId: null as string | null,
+
+  lastLayoutResult: null as LayoutResult | null,
+
+  swimlaneOrientation: 'archimate-layered' as LayoutMode,
+  setSwimlaneOrientation: (o: LayoutMode) => {
+    set({ swimlaneOrientation: o });
+    get().autoLayout();
+  },
 
   // ── Selection ───────────────────────────────────────────────
 
@@ -135,26 +144,21 @@ export const createUiSlice = (set: StoreSet, get: StoreGet) => ({
 
   // ── Layout & Mode ──────────────────────────────────────────
 
-  autoLayout: () => {
+  autoLayout: async () => {
     const s = get();
     const visible = s.getVisibleEntities();
     const visibleRels = s.getVisibleRelationships();
 
-    const childParentIds = new Set<string>();
-    for (const e of visible) {
-      if (e.parentId) {
-        const parentVisible = visible.some((p) => p.id === e.parentId);
-        if (parentVisible) childParentIds.add(e.parentId);
-      }
-    }
-    const layoutEntities = visible.filter((e) => !childParentIds.has(e.id));
+    // Pass ALL visible entities — the layout engine handles
+    // parent/child nesting internally via containment boxes.
+    const layoutEntities = visible;
 
     const lockedOnly = s.positions.filter((p) => p.locked);
-    const result = computeLayout(layoutEntities, lockedOnly, s.visualConfig.nodeDisplayMode, visibleRels, s.activeViewpoints, s.activeZoomLevels);
+    const result = await computeElkLayout(layoutEntities, lockedOnly, s.visualConfig.nodeDisplayMode, visibleRels, s.activeViewpoints, s.activeZoomLevels, s.swimlaneOrientation, s.visualConfig.edgeRouting);
     const newIds = new Set(result.positions.map((p) => p.entityId));
     const kept = s.positions.filter((p) => !newIds.has(p.entityId) && p.locked);
-    set({ positions: [...kept, ...result.positions], scale: 1, panX: 0, panY: 0, manualLayout: false, expandedEntityIds: new Set<string>() });
-    get().addLogEntry('debug', `Auto-layout applied to ${layoutEntities.length} entities`);
+    set({ positions: [...kept, ...result.positions], scale: 1, panX: 0, panY: 0, manualLayout: false, expandedEntityIds: new Set<string>(), lastLayoutResult: result });
+    get().addLogEntry('debug', `Auto-layout applied to ${layoutEntities.length} entities (strategy: ${result.strategy ?? 'default'})`);
   },
 
   setManualLayout: (manual: boolean) => set({ manualLayout: manual }),

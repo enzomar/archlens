@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { KIND_COLORS, MATURITY_COLORS } from '../../domain/types';
 import type { ArchEntity, EntityKind, Maturity, Relationship } from '../../domain/types';
 import { exportEntitiesCsv, exportExcel } from '../../export/exportService';
+import { ConfirmDialog } from '../shared/ConfirmDialog';
 import {
   Pencil, Copy, Trash2, ArrowUpDown, X,
   ChevronDown, ChevronRight, Plus, FileText, Table2, Columns,
@@ -130,7 +131,7 @@ export const EntityListView: React.FC = () => {
   const setShowEntityForm = useStore((s) => s.setShowEntityForm);
   const duplicateEntity = useStore((s) => s.duplicateEntity);
   const deleteEntity    = useStore((s) => s.deleteEntity);
-  const toggleListView  = useStore((s) => s.toggleListView);
+  const setViewMode     = useStore((s) => s.setViewMode);
 
   const [search,        setSearch]        = useState('');
   const [deferredSearch, setDeferredSearch] = useState('');
@@ -142,6 +143,7 @@ export const EntityListView: React.FC = () => {
   const [colWidths,     setColWidths]     = useState<Record<ColKey, number>>(DEFAULT_WIDTHS);
   const [colPickerOpen, setColPickerOpen] = useState(false);
   const [colFilters,    setColFilters]    = useState<Partial<Record<ColKey, string>>>({});
+  const [confirmState, setConfirmState]   = useState<{ message: string; detail?: string; onConfirm: () => void } | null>(null);
 
   const activeColFilterCount = useMemo(
     () => Object.values(colFilters).filter(v => v && v.trim()).length,
@@ -278,17 +280,30 @@ export const EntityListView: React.FC = () => {
   const handleClone = useCallback((id: string) => duplicateEntity(id), [duplicateEntity]);
 
   const handleDelete = useCallback((id: string, name: string) => {
-    if (!confirm(`Delete "${truncName(name)}"? This will also remove all its relationships.`)) return;
-    deleteEntity(id);
-    setCheckedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+    setConfirmState({
+      message: `Delete "${truncName(name)}"?`,
+      detail: 'This will also remove all its relationships.',
+      onConfirm: () => {
+        deleteEntity(id);
+        setCheckedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+        setConfirmState(null);
+      },
+    });
   }, [deleteEntity]);
 
   const handleBulkDelete = () => {
     const ids   = [...checkedIds];
     const names = ids.map((id) => truncName(entityMap.get(id)?.name ?? id, 40));
-    if (!confirm(`Delete ${ids.length} ${ids.length === 1 ? 'entity' : 'entities'}?\n${names.slice(0, 5).join(', ')}${names.length > 5 ? '…' : ''}`)) return;
-    ids.forEach((id) => deleteEntity(id));
-    setCheckedIds(new Set());
+    const preview = names.slice(0, 5).join(', ') + (names.length > 5 ? '…' : '');
+    setConfirmState({
+      message: `Delete ${ids.length} ${ids.length === 1 ? 'entity' : 'entities'}?`,
+      detail: preview,
+      onConfirm: () => {
+        ids.forEach((id) => deleteEntity(id));
+        setCheckedIds(new Set());
+        setConfirmState(null);
+      },
+    });
   };
 
   const selectedEntities = useMemo(
@@ -309,6 +324,16 @@ export const EntityListView: React.FC = () => {
 
   return (
     <div className="entity-list-view">
+      {confirmState && (
+        <ConfirmDialog
+          message={confirmState.message}
+          detail={confirmState.detail}
+          confirmLabel="Delete"
+          danger
+          onConfirm={confirmState.onConfirm}
+          onCancel={() => setConfirmState(null)}
+        />
+      )}
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="entity-list-header">
@@ -406,7 +431,7 @@ export const EntityListView: React.FC = () => {
 
         <button
           className="entity-list-close-btn"
-          onClick={toggleListView}
+          onClick={() => setViewMode('architecture')}
           title="Back to diagram"
           aria-label="Close list view"
         >

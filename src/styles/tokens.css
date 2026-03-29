@@ -58,6 +58,38 @@
   --kind-component: #FDCB6E;
   --kind-artifact: #E17055;
   --kind-trigger: #FD79A8;
+  --kind-aimodel: #7C3AED;
+  --kind-vectorstore: #0EA5E9;
+  --kind-retriever: #8B5CF6;
+  --kind-evaluation: #F59E0B;
+  /* ArchiMate — Business (gold/amber) */
+  --kind-business-actor: #C49A2A;
+  --kind-business-role: #D4A73A;
+  --kind-business-process: #E5B84C;
+  --kind-business-service: #D4A017;
+  --kind-business-object: #B8860B;
+  --kind-business-event: #DAA520;
+  --kind-business-interface: #CD9B1D;
+  --kind-contract: #A67C00;
+  /* ArchiMate — Application (blue) */
+  --kind-application-component: #3B7DD8;
+  --kind-application-service: #4A8DE8;
+  --kind-application-function: #5A9DF8;
+  --kind-application-interface: #2B6DC8;
+  --kind-application-process: #6AADF8;
+  --kind-data-object: #1B5DB8;
+  /* ArchiMate — Technology (green) */
+  --kind-node: #5BA37E;
+  --kind-device: #4B936E;
+  --kind-system-software: #6BB38E;
+  --kind-technology-service: #7BC39E;
+  --kind-communication-network: #3B835E;
+  --kind-technology-interface: #8BD3AE;
+  /* ArchiMate — Strategy/Motivation */
+  --kind-capability: #E67E22;
+  --kind-stakeholder: #9B59B6;
+  --kind-goal: #27AE60;
+  --kind-requirement: #E74C3C;
 
   /* Maturity colors */
   --maturity-dev: #A29BFE;
@@ -66,10 +98,13 @@
   --maturity-mature: #FFEAA7;
   --maturity-decline: #FAB1A0;
 
-  /* Viewpoint colors */
-  --viewpoint-business: #F59E0B;
-  --viewpoint-application: #3B82F6;
-  --viewpoint-technical: #10B981;
+  /* Viewpoint colors (ArchiMate standard) */
+  --viewpoint-business: #C49A2A;
+  --viewpoint-business-bg: #FFFFB5;
+  --viewpoint-application: #3B7DD8;
+  --viewpoint-application-bg: #B5D8FF;
+  --viewpoint-technology: #5BA37E;
+  --viewpoint-technology-bg: #C9E9C9;
 }
 
 @media (prefers-color-scheme: dark) {

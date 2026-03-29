@@ -7,7 +7,7 @@ export const createEntitySlice = (set: StoreSet, get: StoreGet) => ({
   relationships: [] as Relationship[],
   positions: [] as { entityId: string; x: number; y: number; locked: boolean }[],
   traceabilityLinks: [] as { id: string; sourceId: string; targetId: string; type: TraceabilityType; label?: string }[],
-  showListView: false,
+  viewMode: 'architecture' as const,
 
   // ── Entity CRUD ─────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ export const createEntitySlice = (set: StoreSet, get: StoreGet) => ({
     return newId;
   },
 
-  toggleListView: () => set((s) => ({ showListView: !s.showListView })),
+  setViewMode: (mode: 'architecture' | 'list' | 'analysis' | 'organization') => set({ viewMode: mode }),
 
   // ── Relationship CRUD ───────────────────────────────────────
 

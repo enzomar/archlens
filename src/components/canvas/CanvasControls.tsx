@@ -47,9 +47,9 @@ export const CanvasControls: React.FC = () => {
     if (minX === Infinity) return;
     const bw = maxX - minX + 120;
     const bh = maxY - minY + 120;
-    // Assume ~900x600 viewport as rough estimate
-    const vw = 900;
-    const vh = 600;
+    const canvasEl = document.querySelector('.canvas-area') as HTMLElement | null;
+    const vw = canvasEl?.clientWidth ?? window.innerWidth;
+    const vh = canvasEl?.clientHeight ?? window.innerHeight;
     const newScale = Math.min(vw / bw, vh / bh, 1.5);
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
@@ -78,8 +78,9 @@ export const CanvasControls: React.FC = () => {
   // Viewport rect in world coordinates
   const viewport = useMemo(() => {
     if (!bounds) return null;
-    const vw = 900;
-    const vh = 600;
+    const canvasEl = document.querySelector('.canvas-area') as HTMLElement | null;
+    const vw = canvasEl?.clientWidth ?? window.innerWidth;
+    const vh = canvasEl?.clientHeight ?? window.innerHeight;
     return {
       x: -panX / scale,
       y: -panY / scale,
@@ -101,8 +102,9 @@ export const CanvasControls: React.FC = () => {
     const worldX = bounds.minX + (mx / MINIMAP_W) * bounds.width;
     const worldY = bounds.minY + (my / MINIMAP_H) * bounds.height;
     // Center viewport on this point
-    const vw = 900;
-    const vh = 600;
+    const canvasEl = document.querySelector('.canvas-area') as HTMLElement | null;
+    const vw = canvasEl?.clientWidth ?? window.innerWidth;
+    const vh = canvasEl?.clientHeight ?? window.innerHeight;
     setPan(vw / 2 - worldX * scale, vh / 2 - worldY * scale);
   }, [bounds, scale, setPan, mmDrag]);
 

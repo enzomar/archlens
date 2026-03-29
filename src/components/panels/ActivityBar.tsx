@@ -13,11 +13,11 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({ side }) => {
   const leftSidebarOpen = useStore((s) => s.leftSidebarOpen);
   const rightSidebarOpen = useStore((s) => s.rightSidebarOpen);
   const logPanelOpen = useStore((s) => s.logPanelOpen);
-  const showListView = useStore((s) => s.showListView);
+  const viewMode = useStore((s) => s.viewMode);
+  const setViewMode = useStore((s) => s.setViewMode);
   const toggleLeftSidebar = useStore((s) => s.toggleLeftSidebar);
   const toggleRightSidebar = useStore((s) => s.toggleRightSidebar);
   const toggleLogPanel = useStore((s) => s.toggleLogPanel);
-  const toggleListView = useStore((s) => s.toggleListView);
 
   if (side === 'left') {
     return (
@@ -49,11 +49,11 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({ side }) => {
             <GitBranch size={22} />
           </button>
           <button
-            className={`activity-bar-btn ${showListView ? 'activity-bar-btn--active' : ''}`}
-            onClick={toggleListView}
+            className={`activity-bar-btn ${viewMode === 'list' ? 'activity-bar-btn--active' : ''}`}
+            onClick={() => setViewMode(viewMode === 'list' ? 'architecture' : 'list')}
             title="Entity List View"
             aria-label="Toggle entity list view"
-            aria-pressed={showListView}
+            aria-pressed={viewMode === 'list'}
           >
             <List size={22} />
           </button>

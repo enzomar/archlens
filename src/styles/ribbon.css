@@ -211,7 +211,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 10px;
+  padding: 0 4px;
 }
 
 .ribbon-number-row--disabled {
@@ -252,7 +252,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 10px;
+  padding: 0 4px;
 }
 
 .ribbon-slider-icon {
@@ -634,4 +634,142 @@
 
 .ribbon-btn--active .ribbon-btn-label {
   color: var(--accent);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Context Control Bar — C4 Level + ArchiMate Layer toggle chips
+   ═══════════════════════════════════════════════════════════════ */
+
+.ccb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  min-height: 32px;
+  flex-shrink: 0;
+}
+
+/* ── Group (label + chips) ─ */
+.ccb-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ccb-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 2px;
+  user-select: none;
+}
+
+/* ── Divider ── */
+.ccb-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* ── Chip base ── */
+.ccb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.ccb-chip:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+/* ── Chip ON state (C4 levels) ── */
+.ccb-chip--on {
+  background: var(--accent-bg);
+  border-color: var(--accent-light);
+  color: var(--accent);
+}
+
+.ccb-chip--on:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+/* ── Chip icon (C4 shape hint) ── */
+.ccb-chip-icon {
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.ccb-chip--on .ccb-chip-icon {
+  opacity: 1;
+}
+
+/* ── Viewpoint chip dot (ArchiMate color swatch) ── */
+.ccb-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+/* Business */
+.ccb-chip--business .ccb-chip-dot {
+  background: var(--viewpoint-business);
+}
+.ccb-chip--business.ccb-chip--on {
+  border-color: var(--viewpoint-business);
+  background: var(--viewpoint-business-bg);
+  color: var(--viewpoint-business);
+}
+.ccb-chip--business.ccb-chip--on:hover {
+  border-color: var(--viewpoint-business);
+}
+
+/* Application */
+.ccb-chip--application .ccb-chip-dot {
+  background: var(--viewpoint-application);
+}
+.ccb-chip--application.ccb-chip--on {
+  border-color: var(--viewpoint-application);
+  background: var(--viewpoint-application-bg);
+  color: var(--viewpoint-application);
+}
+.ccb-chip--application.ccb-chip--on:hover {
+  border-color: var(--viewpoint-application);
+}
+
+/* Technology */
+.ccb-chip--technology .ccb-chip-dot {
+  background: var(--viewpoint-technology);
+}
+.ccb-chip--technology.ccb-chip--on {
+  border-color: var(--viewpoint-technology);
+  background: var(--viewpoint-technology-bg);
+  color: var(--viewpoint-technology);
+}
+.ccb-chip--technology.ccb-chip--on:hover {
+  border-color: var(--viewpoint-technology);
 }

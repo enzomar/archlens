@@ -60,27 +60,13 @@ export function saveStateToTab(s: ArchLensState, tabId: string): DiagramTab[] {
 }
 
 export function restoreTabToState(tab: DiagramTab): Partial<ArchLensState> {
-  return {
-    entities: tab.entities,
-    relationships: tab.relationships,
-    positions: tab.positions,
-    notes: tab.notes,
-    boundaries: tab.boundaries,
-    traceabilityLinks: tab.traceabilityLinks ?? [],
-    views: tab.views,
-    zoomLevel: tab.zoomLevel,
-    viewpoint: tab.viewpoint ?? 'application',
-    focusEntityId: tab.focusEntityId,
-    breadcrumb: tab.breadcrumb,
-    diagramMode: tab.diagramMode ?? 'focused',
-    panX: tab.panX,
-    panY: tab.panY,
-    scale: tab.scale,
-    filters: tab.filters,
-    visualConfig: tab.visualConfig,
-    selectedEntityId: tab.selectedEntityId,
-    selectedRelationshipId: tab.selectedRelationshipId,
-    selectedNoteId: tab.selectedNoteId,
-    selectedBoundaryId: tab.selectedBoundaryId,
-  };
+  const {
+    id: _id,
+    name: _name,
+    traceabilityLinks = [],
+    viewpoint = 'application' as const,
+    diagramMode = 'focused' as const,
+    ...rest
+  } = tab;
+  return { ...rest, traceabilityLinks, viewpoint, diagramMode };
 }

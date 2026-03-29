@@ -113,6 +113,7 @@ export const RelationshipEdge: React.FC<RelationshipEdgeProps> = ({
         strokeDasharray={visual.dashArray}
         markerEnd="url(#arrowhead)"
         opacity={selected ? 1 : 0.7}
+        style={{ transition: 'd 0.35s ease' }}
       />
 
       {/* Animated element */}

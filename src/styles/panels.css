@@ -153,6 +153,32 @@
   margin-bottom: 4px;
 }
 
+.detail-uuid-details {
+  margin-top: 4px;
+}
+
+.detail-uuid-summary {
+  font-size: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  outline: none;
+}
+.detail-uuid-summary::-webkit-details-marker { display: none; }
+.detail-uuid-summary::before {
+  content: '▶ ';
+  font-size: 8px;
+  vertical-align: middle;
+}
+details[open] .detail-uuid-summary::before {
+  content: '▼ ';
+}
+.detail-uuid-details .detail-uuid-row {
+  margin-top: 4px;
+  padding-left: 8px;
+}
+
 .detail-uuid {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -360,6 +386,29 @@
 .view-item-meta {
   font-size: 10px;
   color: var(--text-muted);
+}
+
+.view-name-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.view-name-input {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font);
+  outline: none;
+}
+.view-name-input:focus {
+  border-color: var(--accent);
 }
 
 /* ── EXPORT PANEL ──────────────────────────────────────────── */

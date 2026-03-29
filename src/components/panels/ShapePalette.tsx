@@ -46,6 +46,50 @@ const PALETTE_GROUPS: PaletteGroup[] = [
     ],
   },
   {
+    title: 'Business Layer',
+    items: [
+      { type: 'entity', kind: 'business-actor', label: 'Business Actor' },
+      { type: 'entity', kind: 'business-role', label: 'Business Role' },
+      { type: 'entity', kind: 'business-process', label: 'Business Process' },
+      { type: 'entity', kind: 'business-service', label: 'Business Service' },
+      { type: 'entity', kind: 'business-object', label: 'Business Object' },
+      { type: 'entity', kind: 'business-event', label: 'Business Event' },
+      { type: 'entity', kind: 'business-interface', label: 'Business Interface' },
+      { type: 'entity', kind: 'contract', label: 'Contract' },
+    ],
+  },
+  {
+    title: 'Application Layer',
+    items: [
+      { type: 'entity', kind: 'application-component', label: 'App Component' },
+      { type: 'entity', kind: 'application-service', label: 'App Service' },
+      { type: 'entity', kind: 'application-function', label: 'App Function' },
+      { type: 'entity', kind: 'application-interface', label: 'App Interface' },
+      { type: 'entity', kind: 'application-process', label: 'App Process' },
+      { type: 'entity', kind: 'data-object', label: 'Data Object' },
+    ],
+  },
+  {
+    title: 'Technology Layer',
+    items: [
+      { type: 'entity', kind: 'node', label: 'Node' },
+      { type: 'entity', kind: 'device', label: 'Device' },
+      { type: 'entity', kind: 'system-software', label: 'System Software' },
+      { type: 'entity', kind: 'technology-service', label: 'Tech Service' },
+      { type: 'entity', kind: 'communication-network', label: 'Network' },
+      { type: 'entity', kind: 'technology-interface', label: 'Tech Interface' },
+    ],
+  },
+  {
+    title: 'Strategy / Motivation',
+    items: [
+      { type: 'entity', kind: 'capability', label: 'Capability' },
+      { type: 'entity', kind: 'stakeholder', label: 'Stakeholder' },
+      { type: 'entity', kind: 'goal', label: 'Goal' },
+      { type: 'entity', kind: 'requirement', label: 'Requirement' },
+    ],
+  },
+  {
     title: 'Cross-Level',
     items: [
       { type: 'entity', kind: 'trigger', label: 'Trigger' },
@@ -165,6 +209,156 @@ const ShapeThumbnail: React.FC<{ item: PaletteItem; disabled: boolean }> = ({ it
           <rect x={2} y={2} width={32} height={24} rx={3} fill="currentColor" opacity={0.1} stroke="currentColor" strokeWidth={1.2} strokeDasharray="4 2" />
           <circle cx={18} cy={12} r={6} fill="none" stroke="currentColor" strokeWidth={1} opacity={0.35} />
           <line x1={18} y1={12} x2={22} y2={8} stroke="currentColor" strokeWidth={1} opacity={0.4} />
+        </svg>
+      );
+    // ArchiMate — Business Actor / Stakeholder (person-like)
+    case 'business-actor':
+    case 'stakeholder':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <circle cx={18} cy={5} r={4} fill="currentColor" opacity={0.3} stroke="currentColor" strokeWidth={1} />
+          <rect x={6} y={10} width={24} height={16} rx={3} fill="currentColor" opacity={0.15} stroke="currentColor" strokeWidth={1.2} />
+        </svg>
+      );
+    // ArchiMate — Business Role (circle marker)
+    case 'business-role':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={2} y={2} width={32} height={24} rx={3} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1.2} />
+          <circle cx={28} cy={8} r={4} fill="currentColor" opacity={0.35} stroke="currentColor" strokeWidth={0.8} />
+        </svg>
+      );
+    // ArchiMate — Process (rounded + arrow)
+    case 'business-process':
+    case 'application-process':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={2} y={2} width={32} height={24} rx={6} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1.2} />
+          <polygon points="27,6 33,14 27,22" fill="currentColor" opacity={0.4} />
+        </svg>
+      );
+    // ArchiMate — Service (rounded top)
+    case 'business-service':
+    case 'application-service':
+    case 'technology-service':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <path d="M2,6 Q2,2 7,2 L29,2 Q34,2 34,6 L34,26 L2,26 Z" fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1.2} />
+        </svg>
+      );
+    // ArchiMate — Object / Data Object (rect + header line)
+    case 'business-object':
+    case 'data-object':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={2} y={2} width={32} height={24} rx={1} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1.2} />
+          <line x1={2} y1={9} x2={34} y2={9} stroke="currentColor" strokeWidth={0.8} opacity={0.3} />
+        </svg>
+      );
+    // ArchiMate — Event (notched left)
+    case 'business-event':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <path d="M7,2 L34,2 L34,26 L7,26 Q2,14 7,2 Z" fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1.2} />
+        </svg>
+      );
+    // ArchiMate — Interface (lollipop)
+    case 'business-interface':
+    case 'application-interface':
+    case 'technology-interface':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={6} y={2} width={28} height={24} rx={2} fill="currentColor" opacity={0.1} stroke="currentColor" strokeWidth={1} />
+          <circle cx={4} cy={14} r={4} fill="currentColor" opacity={0.3} stroke="currentColor" strokeWidth={0.8} />
+        </svg>
+      );
+    // ArchiMate — Contract (folded doc + lines)
+    case 'contract':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <path d={`M2,2 L26,2 L34,10 L34,26 L2,26 Z M26,2 L26,10 L34,10`}
+            fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1.2} />
+          <line x1={8} y1={18} x2={28} y2={18} stroke="currentColor" strokeWidth={0.6} opacity={0.25} />
+          <line x1={8} y1={22} x2={22} y2={22} stroke="currentColor" strokeWidth={0.6} opacity={0.2} />
+        </svg>
+      );
+    // ArchiMate — Application Component (tabs)
+    case 'application-component':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={4} y={2} width={30} height={24} rx={2} fill="currentColor" opacity={0.1} stroke="currentColor" strokeWidth={1} />
+          <rect x={0} y={7} width={8} height={5} rx={1} fill="currentColor" opacity={0.25} stroke="currentColor" strokeWidth={0.8} />
+          <rect x={0} y={16} width={8} height={5} rx={1} fill="currentColor" opacity={0.25} stroke="currentColor" strokeWidth={0.8} />
+        </svg>
+      );
+    // ArchiMate — Application Function (gear)
+    case 'application-function':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={2} y={2} width={32} height={24} rx={4} fill="currentColor" opacity={0.1} stroke="currentColor" strokeWidth={1.2} />
+          <circle cx={28} cy={8} r={4} fill="none" stroke="currentColor" strokeWidth={0.8} opacity={0.35} />
+          <circle cx={28} cy={8} r={1.5} fill="currentColor" opacity={0.35} />
+        </svg>
+      );
+    // ArchiMate — Node (3D box)
+    case 'node':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={0} y={6} width={28} height={20} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1} />
+          <polygon points="0,6 6,0 34,0 28,6" fill="currentColor" opacity={0.06} stroke="currentColor" strokeWidth={0.8} />
+          <polygon points="28,6 34,0 34,20 28,26" fill="currentColor" opacity={0.04} stroke="currentColor" strokeWidth={0.8} />
+        </svg>
+      );
+    // ArchiMate — Device (3D box + base)
+    case 'device':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={0} y={6} width={28} height={17} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1} />
+          <polygon points="0,6 6,0 34,0 28,6" fill="currentColor" opacity={0.06} stroke="currentColor" strokeWidth={0.8} />
+          <polygon points="28,6 34,0 34,17 28,23" fill="currentColor" opacity={0.04} stroke="currentColor" strokeWidth={0.8} />
+          <rect x={2} y={24} width={24} height={3} rx={1} fill="currentColor" opacity={0.25} />
+        </svg>
+      );
+    // ArchiMate — System Software (circle marker)
+    case 'system-software':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={2} y={2} width={32} height={24} rx={3} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1.2} />
+          <circle cx={28} cy={8} r={4} fill="none" stroke="currentColor" strokeWidth={0.8} opacity={0.35} />
+          <circle cx={28} cy={8} r={1.5} fill="currentColor" opacity={0.35} />
+        </svg>
+      );
+    // ArchiMate — Network (line + dots)
+    case 'communication-network':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={2} y={2} width={32} height={24} rx={3} fill="currentColor" opacity={0.1} stroke="currentColor" strokeWidth={1} />
+          <line x1={8} y1={20} x2={28} y2={20} stroke="currentColor" strokeWidth={1} opacity={0.35} />
+          <circle cx={8} cy={20} r={2} fill="currentColor" opacity={0.4} />
+          <circle cx={18} cy={20} r={2} fill="currentColor" opacity={0.4} />
+          <circle cx={28} cy={20} r={2} fill="currentColor" opacity={0.4} />
+        </svg>
+      );
+    // ArchiMate — Capability (rounded)
+    case 'capability':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={2} y={2} width={32} height={24} rx={10} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1.2} />
+        </svg>
+      );
+    // ArchiMate — Goal (ellipse)
+    case 'goal':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <ellipse cx={18} cy={14} rx={16} ry={12} fill="currentColor" opacity={0.12} stroke="currentColor" strokeWidth={1.2} />
+        </svg>
+      );
+    // ArchiMate — Requirement (check mark)
+    case 'requirement':
+      return (
+        <svg width={w} height={h} viewBox="0 0 36 28" className="palette-thumb" style={{ color, opacity: op }}>
+          <rect x={2} y={2} width={32} height={24} rx={2} fill="currentColor" opacity={0.1} stroke="currentColor" strokeWidth={1.2} />
+          <polyline points="22,8 26,12 32,4" fill="none" stroke="currentColor" strokeWidth={1.2} opacity={0.45} />
         </svg>
       );
     default:

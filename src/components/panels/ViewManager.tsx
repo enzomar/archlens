@@ -1,6 +1,6 @@
 import React from 'react';
 import { useStore } from '../../store/useStore';
-import { LayoutGrid, X } from 'lucide-react';
+import { LayoutGrid, X, Check } from 'lucide-react';
 
 export const ViewManager: React.FC = () => {
   const views = useStore((s) => s.views);
@@ -9,10 +9,20 @@ export const ViewManager: React.FC = () => {
   const saveView = useStore((s) => s.saveView);
 
   const [open, setOpen] = React.useState(false);
+  const [showNameInput, setShowNameInput] = React.useState(false);
+  const [pendingName, setPendingName] = React.useState('');
 
-  function handleSaveView() {
-    const name = prompt('View name:');
-    if (name?.trim()) saveView(name.trim());
+  function handleSaveConfirm() {
+    if (pendingName.trim()) {
+      saveView(pendingName.trim());
+      setPendingName('');
+      setShowNameInput(false);
+    }
+  }
+
+  function handleNameKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') handleSaveConfirm();
+    if (e.key === 'Escape') { setShowNameInput(false); setPendingName(''); }
   }
 
   return (
@@ -31,8 +41,30 @@ export const ViewManager: React.FC = () => {
         <div className="view-dropdown">
           <div className="view-dropdown-header">
             <span>Saved Views</span>
-            <button className="btn btn-sm btn-primary" onClick={handleSaveView}>+ Save Current</button>
+            {!showNameInput && (
+              <button className="btn btn-sm btn-primary" onClick={() => setShowNameInput(true)}>+ Save Current</button>
+            )}
           </div>
+          {showNameInput && (
+            <div className="view-name-input-row">
+              <input
+                type="text"
+                className="view-name-input"
+                placeholder="View name…"
+                value={pendingName}
+                onChange={(e) => setPendingName(e.target.value)}
+                onKeyDown={handleNameKeyDown}
+                autoFocus
+                maxLength={80}
+              />
+              <button className="btn-icon" onClick={handleSaveConfirm} aria-label="Save view" title="Save" disabled={!pendingName.trim()}>
+                <Check size={14} />
+              </button>
+              <button className="btn-icon" onClick={() => { setShowNameInput(false); setPendingName(''); }} aria-label="Cancel">
+                <X size={14} />
+              </button>
+            </div>
+          )}
           {views.length === 0 ? (
             <p className="view-empty">No saved views yet.</p>
           ) : (

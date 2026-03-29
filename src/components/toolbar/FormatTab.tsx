@@ -1,6 +1,6 @@
 import React from 'react';
 import { useStore } from '../../store/useStore';
-import { CreditCard, Palette, Zap, Grid3x3, Magnet, LayoutGrid } from 'lucide-react';
+import { CreditCard, Palette, Zap, Grid3x3, Magnet, LayoutGrid, Route } from 'lucide-react';
 
 export const FormatTab: React.FC = () => {
   const visualConfig = useStore((s) => s.visualConfig);
@@ -45,6 +45,17 @@ export const FormatTab: React.FC = () => {
           >
             <span className="ribbon-btn-icon"><Zap size={20} /></span>
             <span className="ribbon-btn-label">{visualConfig.animateEdges === 'off' ? 'Static' : visualConfig.animateEdges === 'on' ? 'Animated' : 'Dynamic'}</span>
+          </button>
+          <button
+            className="ribbon-btn"
+            onClick={() => {
+              const next = visualConfig.edgeRouting === 'ORTHOGONAL' ? 'POLYLINE' : visualConfig.edgeRouting === 'POLYLINE' ? 'SPLINES' : 'ORTHOGONAL';
+              setVisualConfig({ ...visualConfig, edgeRouting: next });
+            }}
+            title={`Edge routing: ${visualConfig.edgeRouting.toLowerCase()}`}
+          >
+            <span className="ribbon-btn-icon"><Route size={20} /></span>
+            <span className="ribbon-btn-label">{visualConfig.edgeRouting === 'ORTHOGONAL' ? 'Orthogonal' : visualConfig.edgeRouting === 'POLYLINE' ? 'Polyline' : 'Splines'}</span>
           </button>
         </div>
         <span className="ribbon-group-label">Effects</span>

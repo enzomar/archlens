@@ -6,7 +6,11 @@ import { NavigatorPanel } from './components/panels/NavigatorPanel';
 import { LogPanel } from './components/panels/LogPanel';
 import { TabBar } from './components/panels/TabBar';
 import { EntityListView } from './components/panels/EntityListView';
-import { PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, ChevronDown, ChevronRight, ZoomIn, ZoomOut, X, Home, LayoutList, Network, Maximize2, Minimize2 } from 'lucide-react';
+import { OrganizationView } from './components/panels/OrganizationView';
+import { AnalysisDashboard } from './components/panels/AnalysisDashboard';
+import './styles/organization.css';
+import './styles/analysis.css';
+import { PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, ChevronDown, ChevronRight, ZoomIn, ZoomOut, X, Home, LayoutList, Network, Maximize2, Minimize2, BarChart3, Building2 } from 'lucide-react';
 import { CanvasControls } from './components/canvas/CanvasControls';
 import { ResizeHandle } from './components/panels/ResizeHandle';
 import { ShapePalette } from './components/panels/ShapePalette';
@@ -18,6 +22,7 @@ import { ExportPanel } from './components/panels/ExportPanel';
 import { ValidationPanel } from './components/panels/ValidationPanel';
 import { ViewManager } from './components/panels/ViewManager';
 import { CommandPalette } from './components/panels/CommandPalette';
+import { RecoveryBanner } from './components/shared/RecoveryBanner';
 import { useStore } from './store/useStore';
 import { exportProject } from './export/exportService';
 import { ContextControlBar } from './components/nav/ContextControlBar';
@@ -37,8 +42,8 @@ const App: React.FC = () => {
   const rightSidebarOpen = useStore((s) => s.rightSidebarOpen);
   const leftSidebarOpen = useStore((s) => s.leftSidebarOpen);
   const logPanelOpen = useStore((s) => s.logPanelOpen);
-  const showListView = useStore((s) => s.showListView);
-  const toggleListView = useStore((s) => s.toggleListView);
+  const viewMode = useStore((s) => s.viewMode);
+  const setViewMode = useStore((s) => s.setViewMode);
   const theme = useStore((s) => s.theme);
   const toggleLeftSidebar = useStore((s) => s.toggleLeftSidebar);
   const toggleRightSidebar = useStore((s) => s.toggleRightSidebar);
@@ -127,31 +132,35 @@ const App: React.FC = () => {
   const AUTOSAVE_KEY = 'archlens-autosave';
   const AUTOSAVE_TS_KEY = 'archlens-autosave-ts';
   const autosaveTimer = useRef<ReturnType<typeof setTimeout>>();
-  const recoveryDismissed = useRef(false);
 
-  // On mount: attempt crash recovery
+  const [recoveryData, setRecoveryData] = useState<{ project: unknown; entityCount: number; savedAt: string } | null>(null);
+
+  // On mount: check for autosaved project — show non-blocking banner instead of confirm() dialog
   useEffect(() => {
     try {
       const saved = localStorage.getItem(AUTOSAVE_KEY);
       const ts = localStorage.getItem(AUTOSAVE_TS_KEY);
-      if (saved && !recoveryDismissed.current) {
+      if (saved) {
         const project = JSON.parse(saved);
         if (project && project.entities && project.entities.length > 0) {
-          const when = ts ? new Date(Number(ts)).toLocaleString() : 'unknown time';
-          const doRecover = window.confirm(
-            `ArchLens found an autosaved project from ${when} with ${project.entities.length} entities.\n\nRestore it?`
-          );
-          if (doRecover) {
-            useStore.getState().loadProject(project);
-          } else {
-            localStorage.removeItem(AUTOSAVE_KEY);
-            localStorage.removeItem(AUTOSAVE_TS_KEY);
-          }
+          const savedAt = ts ? new Date(Number(ts)).toLocaleString() : 'unknown time';
+          setRecoveryData({ project, entityCount: project.entities.length, savedAt });
         }
-        recoveryDismissed.current = true;
       }
     } catch { /* ignore corrupt data */ }
   }, []);
+
+  function handleRestore() {
+    if (!recoveryData) return;
+    useStore.getState().loadProject(recoveryData.project);
+    setRecoveryData(null);
+  }
+
+  function handleDiscardRecovery() {
+    localStorage.removeItem(AUTOSAVE_KEY);
+    localStorage.removeItem(AUTOSAVE_TS_KEY);
+    setRecoveryData(null);
+  }
 
   // Debounced autosave: subscribe to store changes
   useEffect(() => {
@@ -200,18 +209,48 @@ const App: React.FC = () => {
         return;
       }
 
-      // Zoom shortcuts: 1 / 2 / 3 — toggle level in multi-select
+      // Zoom shortcuts: 1/2/3 — exclusive select; Shift+1/2/3 — additive toggle
       const ZOOM_KEYS: Record<string, ZoomLevel> = { '1': 'context', '2': 'container', '3': 'component' };
       if (!ctrl && ZOOM_KEYS[e.key]) {
         e.preventDefault();
-        useStore.getState().toggleActiveZoomLevel(ZOOM_KEYS[e.key]);
+        if (e.shiftKey) {
+          useStore.getState().toggleActiveZoomLevel(ZOOM_KEYS[e.key]);
+        } else {
+          useStore.getState().setZoomLevel(ZOOM_KEYS[e.key]);
+        }
         return;
       }
-      // Viewpoint shortcuts: b / a / t — toggle viewpoint in multi-select
-      const VP_KEYS: Record<string, Viewpoint> = { b: 'business', a: 'application', t: 'technical' };
+      // Viewpoint shortcuts: b/a/t — exclusive select; Shift+b/a/t — additive toggle
+      const VP_KEYS: Record<string, Viewpoint> = { b: 'business', a: 'application', t: 'technology' };
       if (!ctrl && VP_KEYS[key]) {
         e.preventDefault();
-        useStore.getState().toggleActiveViewpoint(VP_KEYS[key]);
+        if (e.shiftKey) {
+          useStore.getState().toggleActiveViewpoint(VP_KEYS[key]);
+        } else {
+          useStore.getState().setViewpoint(VP_KEYS[key]);
+        }
+        return;
+      }
+
+      // Canvas zoom: +/= to zoom in, -/_ to zoom out — relative to canvas centre
+      if (!ctrl && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        const state = useStore.getState();
+        const step = 0.15;
+        const delta = (e.key === '+' || e.key === '=') ? step : -step;
+        const oldScale = state.scale;
+        const newScale = Math.max(0.1, Math.min(4, oldScale + delta));
+        if (newScale !== oldScale) {
+          const canvas = document.querySelector('svg.diagram-canvas');
+          const rect = canvas?.getBoundingClientRect();
+          if (rect) {
+            const cx = rect.width / 2;
+            const cy = rect.height / 2;
+            const ratio = newScale / oldScale;
+            state.setPan(cx - (cx - state.panX) * ratio, cy - (cy - state.panY) * ratio);
+          }
+          state.setScale(newScale);
+        }
         return;
       }
 
@@ -232,8 +271,8 @@ const App: React.FC = () => {
   return (
     <div className={`app${isImmersive ? ' app--immersive' : ''}`}>
       {!isImmersive && <MemoToolbar />}
-      {!isImmersive && !showListView && <ContextControlBar />}
-      {!isImmersive && !showListView && (
+      {!isImmersive && viewMode === 'architecture' && <ContextControlBar />}
+      {!isImmersive && (
         <div className="diagram-nav-bar">
           <button
             className={`panel-toggle-btn ${leftSidebarOpen ? 'panel-toggle-btn--active' : ''}`}
@@ -265,22 +304,40 @@ const App: React.FC = () => {
           <div className="panel-toggles-spacer" />
           <div className="nav-bar-view-btns">
             <button
-              className={`panel-toggle-btn${!showListView ? ' panel-toggle-btn--active' : ''}`}
-              onClick={showListView ? toggleListView : undefined}
-              title="Diagram canvas"
-              aria-pressed={!showListView}
-              aria-label="Switch to diagram canvas"
+              className={`panel-toggle-btn${viewMode === 'architecture' ? ' panel-toggle-btn--active' : ''}`}
+              onClick={() => setViewMode('architecture')}
+              title="Architecture view"
+              aria-pressed={viewMode === 'architecture'}
+              aria-label="Switch to architecture view"
             >
               <Network size={14} />
             </button>
             <button
-              className={`panel-toggle-btn${showListView ? ' panel-toggle-btn--active' : ''}`}
-              onClick={!showListView ? toggleListView : undefined}
+              className={`panel-toggle-btn${viewMode === 'list' ? ' panel-toggle-btn--active' : ''}`}
+              onClick={() => setViewMode('list')}
               title="List view"
-              aria-pressed={showListView}
+              aria-pressed={viewMode === 'list'}
               aria-label="Switch to list view"
             >
               <LayoutList size={14} />
+            </button>
+            <button
+              className={`panel-toggle-btn${viewMode === 'analysis' ? ' panel-toggle-btn--active' : ''}`}
+              onClick={() => setViewMode('analysis')}
+              title="Analysis view"
+              aria-pressed={viewMode === 'analysis'}
+              aria-label="Switch to analysis view"
+            >
+              <BarChart3 size={14} />
+            </button>
+            <button
+              className={`panel-toggle-btn${viewMode === 'organization' ? ' panel-toggle-btn--active' : ''}`}
+              onClick={() => setViewMode('organization')}
+              title="Organization view"
+              aria-pressed={viewMode === 'organization'}
+              aria-label="Switch to organization view"
+            >
+              <Building2 size={14} />
             </button>
           </div>
           <div className="nav-bar-sep" />
@@ -313,8 +370,12 @@ const App: React.FC = () => {
           </>
         )}
         <div className="canvas-and-log">
-          {showListView ? (
+          {viewMode === 'list' ? (
             <EntityListView />
+          ) : viewMode === 'analysis' ? (
+            <AnalysisDashboard />
+          ) : viewMode === 'organization' ? (
+            <OrganizationView />
           ) : (
             <div className="canvas-area">
               <MemoCanvas />
@@ -330,7 +391,7 @@ const App: React.FC = () => {
             </div>
           )}
         </div>
-        {rightSidebarOpen && !isImmersive && !showListView && (
+        {rightSidebarOpen && !isImmersive && viewMode === 'architecture' && (
           <>
             <ResizeHandle direction="horizontal" onResize={onResizeRight} />
             <div className="right-sidebar" style={{ width: rightWidth, minWidth: 200, maxWidth: 500, flexShrink: 0 }}>
@@ -383,11 +444,16 @@ const App: React.FC = () => {
                     <button className="canvas-hud-bc-btn" onClick={() => { while (useStore.getState().breadcrumb.length > 0) drillUp(); }}>
                       <Home size={12} />
                     </button>
-                    {breadcrumb.map((b) => (
-                      <span key={b.id} className="canvas-hud-bc-item">
+                    {breadcrumb.map((b, i) => (
+                      <button
+                        key={b.id}
+                        className="canvas-hud-bc-item"
+                        onClick={() => drillTo(i)}
+                        title={`Navigate to ${b.name}`}
+                      >
                         <span className="canvas-hud-bc-sep">/</span>
                         {b.name}
-                      </span>
+                      </button>
                     ))}
                   </nav>
                 )}
@@ -410,6 +476,16 @@ const App: React.FC = () => {
             </button>
           )}
         </div>
+      )}
+
+      {/* Recovery banner */}
+      {recoveryData && (
+        <RecoveryBanner
+          entityCount={recoveryData.entityCount}
+          savedAt={recoveryData.savedAt}
+          onRestore={handleRestore}
+          onDiscard={handleDiscardRecovery}
+        />
       )}
 
       {/* Modals */}

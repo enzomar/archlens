@@ -9,11 +9,22 @@ import type {
   NoteStyle,
   BoundaryStyle,
   ArchLensProject,
+  ViewFilters,
 } from '../../domain/types';
 import { DEFAULT_NOTE_STYLE, DEFAULT_BOUNDARY_STYLE, inferViewpoint, getKindsForViewpointLevel } from '../../domain/types';
 import type { StoreSet, StoreGet } from '../storeTypes';
 import { DEFAULT_VISUAL_CONFIG } from '../storeTypes';
 import { emptyTabData, saveStateToTab, restoreTabToState } from '../tabHelpers';
+
+// ── Shared filter helper ──────────────────────────────────────────
+function applyFilters(entities: ArchEntity[], f: ViewFilters): ArchEntity[] {
+  let result = entities;
+  if (f.kinds?.length)            result = result.filter((e) => f.kinds!.includes(e.kind));
+  if (f.maturities?.length)       result = result.filter((e) => e.metadata.maturity != null && f.maturities!.includes(e.metadata.maturity!));
+  if (f.tags?.length)             result = result.filter((e) => f.tags!.some((t) => e.metadata.tags.includes(t)));
+  if (f.deploymentStages?.length) result = result.filter((e) => e.metadata.deploymentStage != null && f.deploymentStages!.includes(e.metadata.deploymentStage!));
+  return result;
+}
 
 export const createDataSlice = (set: StoreSet, get: StoreGet, initialTab: DiagramTab) => ({
   projectName: 'Untitled Project',
@@ -284,64 +295,61 @@ export const createDataSlice = (set: StoreSet, get: StoreGet, initialTab: Diagra
   getVisibleEntities: (): ArchEntity[] => {
     const s = get();
 
-    // ── Drill-down view ────────────────────────────────────────────────────────
+    // ── Drill-down view ──────────────────────────────────────────
     if (s.focusEntityId) {
       const allowedKinds = new Set(getKindsForViewpointLevel(s.viewpoint, s.zoomLevel));
-      let visible = s.entities.filter(
-        (e) => e.parentId === s.focusEntityId && allowedKinds.has(e.kind)
+      const visible = s.entities.filter(
+        (e) => e.parentId === s.focusEntityId && allowedKinds.has(e.kind),
       );
-      const f = s.filters;
-      if (f.kinds && f.kinds.length > 0) visible = visible.filter((e) => f.kinds!.includes(e.kind));
-      if (f.maturities && f.maturities.length > 0) visible = visible.filter((e) => e.metadata.maturity && f.maturities!.includes(e.metadata.maturity));
-      if (f.tags && f.tags.length > 0) visible = visible.filter((e) => f.tags!.some((t) => e.metadata.tags.includes(t)));
-      if (f.deploymentStages && f.deploymentStages.length > 0) visible = visible.filter((e) => e.metadata.deploymentStage && f.deploymentStages!.includes(e.metadata.deploymentStage));
-      return visible;
+      return applyFilters(visible, s.filters);
     }
 
-    // ── Standard C4 multi-select view ────────────────────────────────────────
+    // ── Standard C4 multi-select view ───────────────────────────
     const allowedKinds = new Set<string>();
     for (const vp of s.activeViewpoints) {
       for (const zl of s.activeZoomLevels) {
-        for (const k of getKindsForViewpointLevel(vp, zl)) {
-          allowedKinds.add(k);
-        }
-      }
-    }
-    let visible = s.entities.filter(
-      (e) => allowedKinds.has(e.kind) && s.activeViewpoints.includes(e.viewpoint)
-    );
-
-    // Walk up and include ancestor frames at every level
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const visibleIds = new Set(visible.map((e) => e.id));
-      for (const e of [...visible]) {
-        if (e.parentId && !visibleIds.has(e.parentId)) {
-          const parent = s.entities.find((p) => p.id === e.parentId);
-          if (parent) { visible = [...visible, parent]; changed = true; }
-        }
+        for (const k of getKindsForViewpointLevel(vp, zl)) allowedKinds.add(k);
       }
     }
 
-    const f = s.filters;
-    if (f.kinds && f.kinds.length > 0) visible = visible.filter((e) => f.kinds!.includes(e.kind));
-    if (f.maturities && f.maturities.length > 0) visible = visible.filter((e) => e.metadata.maturity && f.maturities!.includes(e.metadata.maturity));
-    if (f.tags && f.tags.length > 0) visible = visible.filter((e) => f.tags!.some((t) => e.metadata.tags.includes(t)));
-    if (f.deploymentStages && f.deploymentStages.length > 0) visible = visible.filter((e) => e.metadata.deploymentStage && f.deploymentStages!.includes(e.metadata.deploymentStage));
+    const visibleIds = new Set<string>();
+    const visible: ArchEntity[] = [];
 
-    // ── Expand in place: reveal children of double-clicked entities ─────────
-    const { expandedEntityIds } = s;
-    if (expandedEntityIds.size > 0) {
+    // Seed with direct matches
+    for (const e of s.entities) {
+      if (allowedKinds.has(e.kind) && s.activeViewpoints.includes(e.viewpoint)) {
+        visible.push(e);
+        visibleIds.add(e.id);
+      }
+    }
+
+    // Walk up ancestry once per entity — O(n × depth) instead of O(n²)
+    const entityMap = new Map(s.entities.map((e) => [e.id, e]));
+    for (const e of [...visible]) {
+      let pid = e.parentId;
+      while (pid && !visibleIds.has(pid)) {
+        const parent = entityMap.get(pid);
+        if (!parent || !s.activeViewpoints.includes(parent.viewpoint)) break;
+        visible.push(parent);
+        visibleIds.add(pid);
+        pid = parent.parentId;
+      }
+    }
+
+    let result = applyFilters(visible, s.filters);
+
+    // ── Expand in place: reveal children of expanded entities ───
+    if (s.expandedEntityIds.size > 0) {
+      const expandedIds = s.expandedEntityIds;
       let expanding = true;
       while (expanding) {
         expanding = false;
-        const visibleIds = new Set(visible.map((e) => e.id));
-        for (const expandedId of expandedEntityIds) {
-          if (!visibleIds.has(expandedId)) continue;
-          for (const child of s.entities.filter((e) => e.parentId === expandedId)) {
-            if (!visibleIds.has(child.id)) {
-              visible = [...visible, child];
+        const currentIds = new Set(result.map((e) => e.id));
+        for (const expandedId of expandedIds) {
+          if (!currentIds.has(expandedId)) continue;
+          for (const child of s.entities) {
+            if (child.parentId === expandedId && !currentIds.has(child.id)) {
+              result = [...result, child];
               expanding = true;
             }
           }
@@ -349,7 +357,7 @@ export const createDataSlice = (set: StoreSet, get: StoreGet, initialTab: Diagra
       }
     }
 
-    return visible;
+    return result;
   },
 
   getVisibleRelationships: (): Relationship[] => {

@@ -91,6 +91,15 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition);
+}
+.canvas-hud-bc-item:hover {
+  color: var(--text-primary);
 }
 
 .canvas-hud-right {
@@ -218,6 +227,75 @@
 
 .help-shortcut span {
   color: var(--text-secondary);
+}
+
+.help-shortcut-group {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 14px 0 6px;
+}
+
+/* ── CONFIRM DIALOG ── */
+.confirm-dialog {
+  max-width: 380px;
+}
+
+.confirm-dialog-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.confirm-dialog-detail {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 16px;
+  padding: 0 20px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+}
+
+/* ── RECOVERY BANNER ── */
+.recovery-banner {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow: var(--shadow-md);
+  font-size: 13px;
+  max-width: 560px;
+  white-space: nowrap;
+}
+
+.recovery-banner-text {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recovery-banner-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 /* ── PULSING HEART ICON ── */

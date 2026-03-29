@@ -671,6 +671,29 @@
   font-weight: 600;
 }
 
+/* Multi-select mode: accent ring on the group */
+.ccb-segmented--multi {
+  box-shadow: 0 0 0 1.5px var(--accent);
+}
+
+/* Multi-count badge next to the label */
+.ccb-multi-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  margin-left: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  line-height: 1;
+  vertical-align: middle;
+}
+
 /* Push context label to far right */
 .ccb-context-label {
   margin-left: auto;

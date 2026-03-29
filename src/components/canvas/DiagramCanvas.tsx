@@ -4,10 +4,9 @@ import { EntityNode } from './EntityNode';
 import { RelationshipEdge, EdgeDefs } from './RelationshipEdge';
 import { NoteNode } from './NoteNode';
 import { BoundaryBox } from './BoundaryBox';
-import { computeLayout, computeGlobalLayout } from '../../layout/layoutEngine';
-import type { GlobalLayoutResult } from '../../layout/layoutEngine';
-import { KIND_COLORS, NODE_DIMENSIONS, NODE_DIMENSIONS_EXTENDED, VIEWPOINT_LABELS, VIEWPOINT_COLORS } from '../../domain/types';
-import type { EntityKind, EdgeType, ZoomLevel, Viewpoint } from '../../domain/types';
+import { computeElkLayout } from '../../layout/elkLayout';
+import { KIND_COLORS, NODE_DIMENSIONS, NODE_DIMENSIONS_EXTENDED, VIEWPOINT_LABELS, VIEWPOINT_COLORS, VIEWPOINT_BG_COLORS } from '../../domain/types';
+import type { EntityKind, EdgeType, Viewpoint } from '../../domain/types';
 import { getValidKindsForViewpoint } from '../../utils/validation';
 import { CanvasContextMenu } from './CanvasContextMenu';
 import type { ContextMenuTarget } from './CanvasContextMenu';
@@ -78,14 +77,10 @@ export const DiagramCanvas: React.FC = () => {
   const toggleSelectEntity = useStore((s) => s.toggleSelectEntity);
   const selectEntities = useStore((s) => s.selectEntities);
   const clearMultiSelect = useStore((s) => s.clearMultiSelect);
-  const deleteSelectedEntities = useStore((s) => s.deleteSelectedEntities);
   const selectRelationship = useStore((s) => s.selectRelationship);
   const setShowRelationshipForm = useStore((s) => s.setShowRelationshipForm);
   const openNewRelationship = useStore((s) => s.openNewRelationship);
-  const drillDown = useStore((s) => s.drillDown);
   const toggleExpandEntity = useStore((s) => s.toggleExpandEntity);
-  const setZoomLevel = useStore((s) => s.setZoomLevel);
-  const setViewpoint = useStore((s) => s.setViewpoint);
   const setPosition = useStore((s) => s.setPosition);
   const setPan = useStore((s) => s.setPan);
   const autoLayout = useStore((s) => s.autoLayout);
@@ -112,14 +107,6 @@ export const DiagramCanvas: React.FC = () => {
   const addEntity = useStore((s) => s.addEntity);
   const addNote = useStore((s) => s.addNote);
   const addBoundary = useStore((s) => s.addBoundary);
-  const deleteEntity = useStore((s) => s.deleteEntity);
-  const deleteNote = useStore((s) => s.deleteNote);
-  const deleteBoundary = useStore((s) => s.deleteBoundary);
-  const deleteRelationship = useStore((s) => s.deleteRelationship);
-  const setShowEntityForm = useStore((s) => s.setShowEntityForm);
-  const setShowNoteForm = useStore((s) => s.setShowNoteForm);
-  const setShowBoundaryForm = useStore((s) => s.setShowBoundaryForm);
-  const setScale = useStore((s) => s.setScale);
 
   const getVisibleEntities = useStore((s) => s.getVisibleEntities);
   const getVisibleRelationships = useStore((s) => s.getVisibleRelationships);
@@ -127,14 +114,9 @@ export const DiagramCanvas: React.FC = () => {
   const visibleEntities = getVisibleEntities();
   const visibleRelationships = getVisibleRelationships();
 
-  // Global layout result (only computed in full mode)
-  const globalLayoutRef = useRef<GlobalLayoutResult | null>(null);
-
   // Auto layout on mount or when visible entities/relationships change
   useEffect(() => {
     if (visibleEntities.length === 0) return;
-
-    globalLayoutRef.current = null;
 
     if (!manualLayout) {
       // Full auto-layout whenever composition changes
@@ -154,12 +136,14 @@ export const DiagramCanvas: React.FC = () => {
         }
       }
       const layoutEntities = visibleEntities.filter((e) => !childParentIds.has(e.id));
-      const result = computeLayout(layoutEntities, positions, visualConfig.nodeDisplayMode, visibleRelationships, activeViewpoints, activeZoomLevels);
-      for (const pos of result.positions) {
-        if (!posMap.has(pos.entityId)) {
-          setPosition(pos.entityId, pos.x, pos.y);
+      computeElkLayout(layoutEntities, positions, visualConfig.nodeDisplayMode, visibleRelationships, activeViewpoints, activeZoomLevels, undefined, visualConfig.edgeRouting).then((result) => {
+        const posMap2 = new Map(positions.map((p) => [p.entityId, p]));
+        for (const pos of result.positions) {
+          if (!posMap2.has(pos.entityId)) {
+            setPosition(pos.entityId, pos.x, pos.y);
+          }
         }
-      }
+      });
     }
   }, [visibleEntities.map((e) => e.id).join(','), visibleRelationships.map((r) => r.id).join(','), manualLayout, activeViewpoints.join(','), activeZoomLevels.join(',')]);
 
@@ -451,7 +435,7 @@ export const DiagramCanvas: React.FC = () => {
         const wy = (e.clientY - svgRect.top - panY) / scale;
         const DIMS_MAP = visualConfig.nodeDisplayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
 
-        // 1. Check entities
+        // 1. Check entities (leaf nodes with positions)
         let found: InspectTarget | null = null;
         for (const entity of visibleEntities) {
           const pos = posMap.get(entity.id);
@@ -461,6 +445,22 @@ export const DiagramCanvas: React.FC = () => {
             const rels = relationships.filter((r) => r.sourceId === entity.id || r.targetId === entity.id);
             found = { kind: 'entity', entity, position: pos, relationships: rels };
             break;
+          }
+        }
+
+        // 1b. Check containment boxes (parent entities without node positions)
+        if (!found && containmentBoxes) {
+          // Iterate in reverse so deeper (smaller) boxes are hit first
+          for (let i = containmentBoxes.length - 1; i >= 0; i--) {
+            const box = containmentBoxes[i];
+            if (wx >= box.x && wx <= box.x + box.width && wy >= box.y && wy <= box.y + box.height) {
+              const entity = entityMap.get(box.entityId);
+              if (entity) {
+                const rels = relationships.filter((r) => r.sourceId === entity.id || r.targetId === entity.id);
+                found = { kind: 'entity', entity, position: { entityId: entity.id, x: box.x, y: box.y, locked: false }, relationships: rels };
+                break;
+              }
+            }
           }
         }
 
@@ -594,9 +594,24 @@ export const DiagramCanvas: React.FC = () => {
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    const sensitivity = useStore.getState().zoomSensitivity ?? 0.08;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const state = useStore.getState();
+    const sensitivity = state.zoomSensitivity ?? 0.08;
     const delta = e.deltaY > 0 ? -sensitivity : sensitivity;
-    useStore.getState().setScale(useStore.getState().scale + delta);
+    const oldScale = state.scale;
+    const newScale = Math.max(0.1, Math.min(4, oldScale + delta));
+    if (newScale === oldScale) return;
+
+    // Zoom toward mouse cursor position
+    const rect = svg.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const ratio = newScale / oldScale;
+    const newPanX = mx - (mx - state.panX) * ratio;
+    const newPanY = my - (my - state.panY) * ratio;
+    state.setPan(newPanX, newPanY);
+    state.setScale(newScale);
   }, []);
 
   // Attach wheel listener as non-passive so preventDefault works
@@ -676,13 +691,17 @@ export const DiagramCanvas: React.FC = () => {
   // C4 diagram title
   const focusEntity = focusEntityId ? entities.find((e) => e.id === focusEntityId) : null;
   const isGlobalView = false;
+  const lastLayoutResult = useStore((s) => s.lastLayoutResult);
+  const swimlanes = lastLayoutResult?.swimlanes;
+  const containmentBoxes = lastLayoutResult?.containmentBoxes;
+  const isSwimlaneView = lastLayoutResult?.strategy === 'swimlane' && !!swimlanes;
   const diagramTitle = focusEntityId
     ? `${VIEWPOINT_LABELS[viewpoint]} · ${ZOOM_TITLES[zoomLevel]} — ${focusEntity?.name ?? projectName}`
     : `${activeViewpoints.map((vp) => VIEWPOINT_LABELS[vp]).join(' + ')} · ${activeZoomLevels.map((zl) => ZOOM_TITLES[zl] ?? zl).join(' + ')}`;
 
-  // Global layout swim-lane/row metadata
-  const globalLanes = globalLayoutRef.current?.vpLanes ?? [];
-  const globalRows = globalLayoutRef.current?.levelRows ?? [];
+  // Global layout swim-lane/row metadata (global view is currently disabled)
+  const globalLanes: { viewpoint: Viewpoint; x: number; y: number; width: number; height: number }[] = [];
+  const globalRows: { level: string; x: number; y: number; width: number; height: number }[] = [];
 
   // Collect unique kinds and edge types visible for the key/legend
   const visibleKinds = useMemo(() => {
@@ -735,12 +754,16 @@ export const DiagramCanvas: React.FC = () => {
     const FRAME_PAD = 40;
     const DIMS_MAP = visualConfig.nodeDisplayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
 
+    // Skip entities already rendered as ELK containment boxes
+    const elkBoxIds = new Set((containmentBoxes ?? []).map((b) => b.entityId));
+
     // Group visible entities by parentId (only when parent is also visible)
     const visibleIds = new Set(visibleEntities.map((e) => e.id));
     const groups = new Map<string, typeof visibleEntities>();
     for (const e of visibleEntities) {
       if (!e.parentId) continue;
       if (!visibleIds.has(e.parentId)) continue; // parent must also be visible
+      if (elkBoxIds.has(e.parentId)) continue;    // already an ELK containment box
       const arr = groups.get(e.parentId);
       if (arr) arr.push(e);
       else groups.set(e.parentId, [e]);
@@ -786,7 +809,7 @@ export const DiagramCanvas: React.FC = () => {
       });
     }
     return frames;
-  }, [focusEntityId, visibleEntities, posMap, entities, visualConfig.nodeDisplayMode]);
+  }, [focusEntityId, visibleEntities, posMap, entities, visualConfig.nodeDisplayMode, containmentBoxes]);
 
   // ── Cross-boundary relationships ───────────────────────────────
   // Relationships that connect the focused entity to its peers at
@@ -868,27 +891,28 @@ export const DiagramCanvas: React.FC = () => {
           <g className="layer-global-grid" pointerEvents="none">
             {/* Viewpoint horizontal swim-lane rows (ArchiMate layers) */}
             {globalLanes.map((lane) => {
-              const color = VIEWPOINT_COLORS[lane.viewpoint];
+              const borderColor = VIEWPOINT_COLORS[lane.viewpoint];
+              const bgColor = VIEWPOINT_BG_COLORS[lane.viewpoint];
               return (
                 <g key={lane.viewpoint}>
                   <rect
                     x={lane.x - 8} y={lane.y - 8}
                     width={lane.width + 16} height={lane.height + 16}
                     rx={14}
-                    fill={color} fillOpacity={0.06}
-                    stroke={color} strokeWidth={1.5} strokeDasharray="6 3"
-                    opacity={0.5}
+                    fill={bgColor} fillOpacity={0.25}
+                    stroke={borderColor} strokeWidth={1.5}
+                    opacity={0.6}
                   />
                   <text
                     x={lane.x - 16}
                     y={lane.y + lane.height / 2}
                     textAnchor="end"
                     dominantBaseline="middle"
-                    fill={color}
+                    fill={borderColor}
                     fontSize={14}
                     fontWeight={700}
                     fontFamily="var(--font)"
-                    opacity={0.8}
+                    opacity={0.85}
                   >
                     {VIEWPOINT_LABELS[lane.viewpoint]}
                   </text>
@@ -927,6 +951,102 @@ export const DiagramCanvas: React.FC = () => {
               />
             ))}
           </g>
+        )}
+
+        {/* ── Swimlane View: ArchiMate viewpoint rows/columns with nested C4 containment ── */}
+        {isSwimlaneView && swimlanes && (
+          <>
+          <g className="layer-swimlanes" pointerEvents="none">
+            {/* Viewpoint swimlane backgrounds */}
+            {swimlanes.map((lane, idx) => {
+              const borderColor = VIEWPOINT_COLORS[lane.viewpoint];
+              const bgColor = VIEWPOINT_BG_COLORS[lane.viewpoint];
+              const isC4NestedMode = lastLayoutResult?.orientation === 'c4-nested';
+              return (
+                <g key={`lane-${lane.viewpoint}-${idx}`}>
+                  <rect
+                    x={lane.x}
+                    y={lane.y}
+                    width={lane.width}
+                    height={lane.height}
+                    rx={8}
+                    fill={bgColor} fillOpacity={0.25}
+                    stroke={borderColor} strokeWidth={1.5}
+                    opacity={0.6}
+                    style={{ transition: 'x 0.35s ease, y 0.35s ease, width 0.35s ease, height 0.35s ease' }}
+                  />
+                  {!isC4NestedMode && (
+                    /* Layer mode: rotated label left of each row */
+                    <text
+                      x={lane.x - 12}
+                      y={lane.y + lane.height / 2}
+                      textAnchor="end"
+                      dominantBaseline="middle"
+                      fill={borderColor}
+                      fontSize={11}
+                      fontWeight={700}
+                      fontFamily="var(--font)"
+                      opacity={0.85}
+                      style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                      transform={`rotate(-90, ${lane.x - 12}, ${lane.y + lane.height / 2})`}
+                    >
+                      {VIEWPOINT_LABELS[lane.viewpoint]}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+
+          {/* Containment boxes (system / container boundaries) */}
+          <g className="layer-containment-boxes">
+            {containmentBoxes?.map((box) => {
+              const borderColor = VIEWPOINT_COLORS[box.viewpoint];
+              const bgColor = VIEWPOINT_BG_COLORS[box.viewpoint];
+              const isSelected = selectedEntityId === box.entityId || selectedEntityIds.has(box.entityId);
+              return (
+                <g
+                  key={`cbox-${box.entityId}`}
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (e.shiftKey) {
+                      toggleSelectEntity(box.entityId);
+                    } else {
+                      selectEntity(box.entityId);
+                    }
+                  }}
+                >
+                  <rect
+                    x={box.x}
+                    y={box.y}
+                    width={box.width}
+                    height={box.height}
+                    rx={6}
+                    fill={bgColor} fillOpacity={0.08}
+                    stroke={borderColor}
+                    strokeWidth={isSelected ? 2.5 : (box.depth === 0 ? 2 : 1.5)}
+                    strokeDasharray={box.depth === 0 ? '8 4' : '5 3'}
+                    opacity={isSelected ? 0.85 : 0.5}
+                    style={{ transition: 'x 0.35s ease, y 0.35s ease, width 0.35s ease, height 0.35s ease' }}
+                  />
+                  <text
+                    x={box.x + 8}
+                    y={box.y + 16}
+                    fill={borderColor}
+                    fontSize={10}
+                    fontWeight={600}
+                    fontFamily="var(--font)"
+                    opacity={0.7}
+                    pointerEvents="none"
+                  >
+                    {box.label}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+          </>
         )}
 
         {/* ── Layer 0 (deepest): Prezi parent frame ── */}
