@@ -13,7 +13,7 @@ import {
 
 type ColKey =
   | 'name' | 'shortName' | 'kind' | 'viewpoint' | 'zoomLevel' | 'maturity'
-  | 'technology' | 'owner' | 'deploymentStage' | 'parent'
+  | 'technology' | 'owner' | 'organization' | 'sme' | 'deploymentStage' | 'parent'
   | 'identificationId' | 'description' | 'size' | 'appType' | 'techConvergency'
   | 'tps' | 'compute' | 'pii' | 'pciDss' | 'url' | 'codeRepository' | 'adrUrl' | 'notes';
 
@@ -31,11 +31,13 @@ const ALL_COLUMNS: ColDef[] = [
   { key: 'name',            label: 'Name',         defaultWidth: 200, defaultVisible: true,  alwaysVisible: true },
   { key: 'shortName',       label: 'Short Name',   defaultWidth: 110, defaultVisible: true  },
   { key: 'kind',            label: 'Kind',         defaultWidth: 110, defaultVisible: true  },
-  { key: 'viewpoint',       label: 'Viewpoint',    defaultWidth: 100, defaultVisible: true  },
-  { key: 'zoomLevel',       label: 'Zoom Level',   defaultWidth: 100, defaultVisible: false },
+  { key: 'viewpoint',       label: 'Layer',        defaultWidth: 100, defaultVisible: true  },
+  { key: 'zoomLevel',       label: 'Abstraction',  defaultWidth: 100, defaultVisible: false },
   { key: 'maturity',        label: 'Maturity',     defaultWidth: 90,  defaultVisible: true  },
   { key: 'technology',      label: 'Technology',   defaultWidth: 130, defaultVisible: true  },
   { key: 'owner',           label: 'Owner',        defaultWidth: 130, defaultVisible: true  },
+  { key: 'organization',    label: 'Organization', defaultWidth: 150, defaultVisible: true  },
+  { key: 'sme',             label: 'SME',          defaultWidth: 130, defaultVisible: false },
   { key: 'deploymentStage', label: 'Stage',        defaultWidth: 90,  defaultVisible: true  },
   { key: 'parent',          label: 'Parent',       defaultWidth: 130, defaultVisible: true  },
   { key: 'identificationId',label: 'ID',           defaultWidth: 120, defaultVisible: false },
@@ -72,6 +74,8 @@ function getCellText(entity: ArchEntity, field: ColKey, entityMap: Map<string, A
     case 'maturity':         return entity.metadata.maturity ?? '';
     case 'technology':       return entity.metadata.technology ?? '';
     case 'owner':            return entity.metadata.owner ?? '';
+    case 'organization':     return entity.metadata.organization ?? '';
+    case 'sme':              return entity.metadata.sme ?? '';
     case 'deploymentStage':  return entity.metadata.deploymentStage ?? '';
     case 'parent':           return (entity.parentId ? entityMap.get(entity.parentId)?.name : entity.parentName) ?? '';
     case 'identificationId': return entity.identificationId ?? '';
@@ -106,7 +110,15 @@ function renderCell(entity: ArchEntity, col: ColKey, parentName: string): React.
     case 'zoomLevel':        return entity.zoomLevel ?? '';
     case 'maturity':         return entity.metadata.maturity ? <MaturityBadge maturity={entity.metadata.maturity} /> : null;
     case 'technology':       return <span className="entity-list-tech">{entity.metadata.technology ?? ''}</span>;
-    case 'owner':            return entity.metadata.owner ?? '';
+    case 'owner':            return entity.metadata.owner
+      ? <span className="elv-person" title={`Owner: ${entity.metadata.owner}`}>{entity.metadata.owner}</span>
+      : null;
+    case 'organization':     return entity.metadata.organization
+      ? <span className="elv-org" title={entity.metadata.organization}>{entity.metadata.organization}</span>
+      : null;
+    case 'sme':              return entity.metadata.sme
+      ? <span className="elv-person elv-person--sme" title={`SME: ${entity.metadata.sme}`}>★ {entity.metadata.sme}</span>
+      : null;
     case 'deploymentStage':  return entity.metadata.deploymentStage ?? '';
     case 'parent':           return parentName;
     case 'identificationId': return <span className="entity-list-mono-cell">{entity.identificationId ?? ''}</span>;
@@ -216,7 +228,9 @@ export const EntityListView: React.FC = () => {
           e.kind.toLowerCase().includes(q)                         ||
           e.description.toLowerCase().includes(q)                  ||
           (e.metadata.technology ?? '').toLowerCase().includes(q)  ||
-          (e.metadata.owner ?? '').toLowerCase().includes(q),
+          (e.metadata.owner ?? '').toLowerCase().includes(q) ||
+          (e.metadata.organization ?? '').toLowerCase().includes(q) ||
+          (e.metadata.sme ?? '').toLowerCase().includes(q),
       );
     }
     // Per-column filters

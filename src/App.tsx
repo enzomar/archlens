@@ -23,8 +23,9 @@ import { ValidationPanel } from './components/panels/ValidationPanel';
 import { ViewManager } from './components/panels/ViewManager';
 import { CommandPalette } from './components/panels/CommandPalette';
 import { RecoveryBanner } from './components/shared/RecoveryBanner';
+import { WelcomeOverlay } from './components/shared/WelcomeOverlay';
 import { useStore } from './store/useStore';
-import { exportProject } from './export/exportService';
+import { exportProject, exportProjectAs } from './export/exportService';
 import { ContextControlBar } from './components/nav/ContextControlBar';
 import type { ZoomLevel, Viewpoint } from './domain/types';
 import './App.css';
@@ -203,6 +204,13 @@ const App: React.FC = () => {
         useStore.temporal.getState().redo();
         return;
       }
+      if (ctrl && e.shiftKey && key === 's') {
+        e.preventDefault();
+        const project = useStore.getState().getProject();
+        const name = prompt('Save as:', project.name);
+        if (name) exportProjectAs(project, name);
+        return;
+      }
       if (ctrl && key === 's') {
         e.preventDefault();
         exportProject(useStore.getState().getProject());
@@ -274,15 +282,19 @@ const App: React.FC = () => {
       {!isImmersive && viewMode === 'architecture' && <ContextControlBar />}
       {!isImmersive && (
         <div className="diagram-nav-bar">
-          <button
-            className={`panel-toggle-btn ${leftSidebarOpen ? 'panel-toggle-btn--active' : ''}`}
-            onClick={toggleLeftSidebar}
-            title={leftSidebarOpen ? 'Hide left panel' : 'Show left panel'}
-            aria-pressed={leftSidebarOpen}
-          >
-            {leftSidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
-          </button>
-          {breadcrumb.length > 0 && (
+          {/* Left sidebar toggle — only in architecture mode */}
+          {viewMode === 'architecture' && (
+            <button
+              className={`panel-toggle-btn ${leftSidebarOpen ? 'panel-toggle-btn--active' : ''}`}
+              onClick={toggleLeftSidebar}
+              title={leftSidebarOpen ? 'Hide left panel' : 'Show left panel'}
+              aria-pressed={leftSidebarOpen}
+            >
+              {leftSidebarOpen ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+            </button>
+          )}
+          {/* Breadcrumb — only in architecture mode */}
+          {viewMode === 'architecture' && breadcrumb.length > 0 && (
             <nav className="breadcrumb" aria-label="Navigation breadcrumb">
               <button className="breadcrumb-item" onClick={() => { while (useStore.getState().breadcrumb.length > 0) drillUp(); }} aria-label="Go to root">
                 <Home size={12} />
@@ -340,28 +352,33 @@ const App: React.FC = () => {
               <Building2 size={14} />
             </button>
           </div>
-          <div className="nav-bar-sep" />
-          <button
-            className="panel-toggle-btn"
-            onClick={() => setUiMode(uiMode === 'distraction-free' ? 'normal' : 'distraction-free')}
-            title={uiMode === 'distraction-free' ? 'Exit fullscreen (F11)' : 'Fullscreen (F11)'}
-            aria-label={uiMode === 'distraction-free' ? 'Exit fullscreen' : 'Fullscreen'}
-          >
-            {uiMode === 'distraction-free' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
-          <div className="nav-bar-sep" />
-          <button
-            className={`panel-toggle-btn ${rightSidebarOpen ? 'panel-toggle-btn--active' : ''}`}
-            onClick={toggleRightSidebar}
-            title={rightSidebarOpen ? 'Hide right panel' : 'Show right panel'}
-            aria-pressed={rightSidebarOpen}
-          >
-            {rightSidebarOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-          </button>
+          {/* Fullscreen + right sidebar — only in architecture mode */}
+          {viewMode === 'architecture' && (
+            <>
+              <div className="nav-bar-sep" />
+              <button
+                className="panel-toggle-btn"
+                onClick={() => setUiMode(uiMode === 'distraction-free' ? 'normal' : 'distraction-free')}
+                title={uiMode === 'distraction-free' ? 'Exit fullscreen (F11)' : 'Fullscreen (F11)'}
+                aria-label={uiMode === 'distraction-free' ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                {uiMode === 'distraction-free' ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              </button>
+              <div className="nav-bar-sep" />
+              <button
+                className={`panel-toggle-btn ${rightSidebarOpen ? 'panel-toggle-btn--active' : ''}`}
+                onClick={toggleRightSidebar}
+                title={rightSidebarOpen ? 'Hide right panel' : 'Show right panel'}
+                aria-pressed={rightSidebarOpen}
+              >
+                {rightSidebarOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+              </button>
+            </>
+          )}
         </div>
       )}
       <div className="app-body" role="main">
-        {leftSidebarOpen && !isImmersive && (
+        {leftSidebarOpen && !isImmersive && viewMode === 'architecture' && (
           <>
             <div className="left-sidebar" style={{ width: leftWidth, minWidth: 160, maxWidth: 500, flexShrink: 0 }}>
               <ShapePalette />
@@ -495,6 +512,8 @@ const App: React.FC = () => {
       <BoundaryForm />
       <ExportPanel />
       {showCommandPalette && <CommandPalette onClose={() => setShowCommandPalette(false)} />}
+
+      <WelcomeOverlay />
     </div>
   );
 };

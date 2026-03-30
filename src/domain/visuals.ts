@@ -78,6 +78,14 @@ export const VIEWPOINT_LABELS: Record<Viewpoint, string> = {
   global: 'Global',
 };
 
+/** Canonical display labels for C4 zoom / abstraction levels. */
+export const ZOOM_LEVEL_LABELS: Record<string, string> = {
+  context: 'System Context',
+  container: 'Container',
+  component: 'Component',
+  code: 'Code',
+};
+
 // ─── FIELD HELP DESCRIPTIONS ─────────────────────────────────────
 
 export const FIELD_HELP: Record<string, string> = {
@@ -100,11 +108,13 @@ export const FIELD_HELP: Record<string, string> = {
   codeRepository: 'URL or path to the source code repository (e.g. a GitHub URL).',
   pii: 'Personally Identifiable Information — check if this entity processes or stores PII data.',
   pciDss: 'PCI-DSS compliance — check if this entity is subject to Payment Card Industry Data Security Standards.',
-  owner: 'The team or person responsible for this entity.',
+  owner: 'The manager or accountable person responsible for this entity (full name).',
+  organization: 'The squad, department, or business unit that owns this entity.',
+  sme: 'Subject Matter Expert — the person with the deepest technical knowledge of this entity.',
   tags: 'Predefined categorical tags for filtering and classification.',
   notes: 'Free-form notes and additional context.',
-  viewpoint: 'The architectural viewpoint this entity belongs to: Business (processes & actors), Application (software & APIs), Technology (infrastructure & deployment), Global (cross-cutting).',
-  zoomLevel: 'The C4 zoom level (abstraction level) of this entity: Context (systems & actors), Container (deployable units), Component (internal modules), Code (classes & functions).',
+  viewpoint: 'The architectural layer this entity belongs to: Business (processes & actors), Application (software & APIs), Technology (infrastructure & deployment), Global (cross-cutting).',
+  zoomLevel: 'The abstraction level of this entity: Context (systems & actors), Container (deployable units), Component (internal modules), Code (classes & functions).',
 };
 
 // ─── EDGE VISUAL CONFIG ─────────────────────────────────────────

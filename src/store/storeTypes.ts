@@ -36,9 +36,11 @@ export const DEFAULT_VISUAL_CONFIG: VisualConfig = {
   colorBy: 'kind',
   animateEdges: 'on',
   nodeDisplayMode: 'standard',
-  edgeRouting: 'ORTHOGONAL',
+  edgeRoutingContainment: 'ORTHOGONAL',
+  edgeRoutingExternal: 'POLYLINE',
   showGrid: true,
   snapToGrid: false,
+  showAlignGuides: false,
 };
 
 // ─── STORE STATE ─────────────────────────────────────────────────
@@ -223,9 +225,22 @@ export interface ArchLensState {
   toggleShowMinimap: () => void;
   toggleShowValidationPanel: () => void;
   toggleShowViewsPanel: () => void;
-  // ── Inspect mode ──────────────────────────────────────────
+  // ── Canvas interaction mode ────────────────────────────────
+  canvasMode: import('../domain/types').CanvasMode;
+  setCanvasMode: (mode: import('../domain/types').CanvasMode) => void;
+  /** Convenience alias — true when canvasMode is 'inspect'. */
   inspectMode: boolean;
   toggleInspectMode: () => void;
+  // ── Highlight / spotlight shapes ────────────────────────────
+  highlightShapes: import('../domain/types').HighlightShape[];
+  selectedHighlightId: string | null;
+  selectHighlight: (id: string | null) => void;
+  /** 'rect' or 'ellipse' — the shape the next highlight draw will create */
+  highlightShapeType: 'rect' | 'ellipse';
+  setHighlightShapeType: (t: 'rect' | 'ellipse') => void;
+  addHighlightShape: (shape: import('../domain/types').HighlightShape) => void;
+  removeHighlightShape: (id: string) => void;
+  clearHighlightShapes: () => void;
   // ── Expand in place ───────────────────────────────────────
   expandedEntityIds: Set<string>;
   toggleExpandEntity: (id: string) => void;

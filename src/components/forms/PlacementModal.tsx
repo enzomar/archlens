@@ -4,6 +4,7 @@ import {
   Square, Layers, Package,
 } from 'lucide-react';
 import type { EntityKind, Viewpoint, ZoomLevel } from '../../domain/types';
+import { VIEWPOINT_LABELS } from '../../domain/types';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -135,12 +136,6 @@ const KIND_LABEL: Record<string, string> = {
   container:  'Container',
   component:  'Component',
   evaluation: 'Evaluation',
-};
-
-const VIEWPOINT_LABEL: Record<string, string> = {
-  business:    'Business',
-  application: 'Application',
-  technology: 'Technology',
 };
 
 const KIND_EXPLANATION: Record<string, string> = {
@@ -312,7 +307,7 @@ export const PlacementModal: React.FC<Props> = ({ onConfirm, onSkip }) => {
             <div className="pm-result">
               <div className="pm-result-label">Suggested placement</div>
               <div className="pm-result-pill">
-                <span className="pm-result-vp">{VIEWPOINT_LABEL[result.viewpoint]}</span>
+                <span className="pm-result-vp">{VIEWPOINT_LABELS[result.viewpoint]}</span>
                 <span className="pm-result-sep">·</span>
                 <span className="pm-result-kind">{KIND_LABEL[result.kind] ?? result.kind}</span>
               </div>

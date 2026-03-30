@@ -97,6 +97,8 @@ export const EntityForm: React.FC = () => {
   const [techConvergency, setTechConvergency] = useState<TechConvergency | 0>(0);
   const [technology, setTechnology] = useState('');
   const [owner, setOwner] = useState('');
+  const [organization, setOrganization] = useState('');
+  const [sme, setSme] = useState('');
 
   const [notes, setNotes] = useState('');
   const [tps, setTps] = useState<string>('');
@@ -127,6 +129,9 @@ export const EntityForm: React.FC = () => {
   // ── Active tab ───────────────────────────────────────────────
   type Tab = 'identity' | 'details' | 'relationships';
   const [activeTab, setActiveTab] = useState<Tab>('identity');
+
+  // ── Advanced section toggle (collapsed by default for new entities) ─
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Auto-open wizard for new entities (not editing)
   useEffect(() => {
@@ -194,6 +199,8 @@ export const EntityForm: React.FC = () => {
       setTechConvergency((editing.metadata.techConvergency as TechConvergency) ?? 0);
       setTechnology(editing.metadata.technology ?? '');
       setOwner(editing.metadata.owner ?? '');
+      setOrganization(editing.metadata.organization ?? '');
+      setSme(editing.metadata.sme ?? '');
       // tags field removed
       setNotes(editing.metadata.notes ?? '');
       setTps(editing.metadata.tps != null ? String(editing.metadata.tps) : '');
@@ -214,6 +221,13 @@ export const EntityForm: React.FC = () => {
         existingId: r.id,
       })));
       setDeletedRelIds([]);
+      // Auto-expand advanced section when editing entities with advanced data
+      const m = editing.metadata;
+      const hasAdvanced = !!(m.maturity || m.size || m.appType || m.deploymentStage || m.technology
+        || m.owner || m.organization || m.sme || m.tps != null || m.compute
+        || m.codeRepository || m.pii || m.pciDss || m.adrUrl || m.notes)
+        || entityRels.length > 0;
+      setShowAdvanced(hasAdvanced);
     } else {
       resetForm();
     }
@@ -223,13 +237,14 @@ export const EntityForm: React.FC = () => {
     setName(''); setShortName(''); setIdentificationId(''); setDescription(''); setParentName('');
     setKind('system'); setParentId(''); setResponsibilities([]); setNewResponsibility('');
     setMaturity(''); setSize(''); setAppType(''); setDeploymentStage('');
-    setTechConvergency(0); setTechnology(''); setOwner(''); setNotes('');
+    setTechConvergency(0); setTechnology(''); setOwner(''); setOrganization(''); setSme(''); setNotes('');
     setTps(''); setCompute(''); setCodeRepository('');
     setPii(false); setPciDss(false); setAdrUrl(''); setErrors([]);
     setFormViewpoint(storeViewpoint); setFormZoomLevel(zoomLevel);
     setRelDrafts([]); setDeletedRelIds([]);
     setShowAddRel(false); resetNewRel();
     setActiveTab('identity');
+    setShowAdvanced(false);
   }
 
   function validate(): boolean {
@@ -263,6 +278,8 @@ export const EntityForm: React.FC = () => {
       ...(techConvergency && { techConvergency: techConvergency as TechConvergency }),
       ...(technology && { technology }),
       ...(owner && { owner }),
+      ...(organization && { organization }),
+      ...(sme && { sme }),
       ...(notes && { notes }),
       ...(tps && { tps: Number(tps) }),
       ...(compute && { compute: compute as TShirtSize }),
@@ -495,16 +512,18 @@ export const EntityForm: React.FC = () => {
               Identity
               {identityErrorCount > 0 && <span className="ef-tab-badge ef-tab-badge--error">{identityErrorCount}</span>}
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'details'}
-              className={`ef-tab-btn${activeTab === 'details' ? ' active' : ''}`}
-              onClick={() => setActiveTab('details')}
-            >
-              Details
-            </button>
-            {showRelationships && (
+            {showAdvanced && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'details'}
+                className={`ef-tab-btn${activeTab === 'details' ? ' active' : ''}`}
+                onClick={() => setActiveTab('details')}
+              >
+                Details
+              </button>
+            )}
+            {showAdvanced && showRelationships && (
               <button
                 type="button"
                 role="tab"
@@ -514,6 +533,15 @@ export const EntityForm: React.FC = () => {
               >
                 Relationships
                 {relDrafts.length > 0 && <span className="ef-tab-badge">{relDrafts.length}</span>}
+              </button>
+            )}
+            {!showAdvanced && (
+              <button
+                type="button"
+                className="ef-tab-btn ef-tab-btn--disclosure"
+                onClick={() => { setShowAdvanced(true); setActiveTab('details'); }}
+              >
+                Show advanced…
               </button>
             )}
           </div>
@@ -543,10 +571,10 @@ export const EntityForm: React.FC = () => {
                 </div>
               </div>
 
-              {/* Viewpoint + C4 Zoom Level */}
+              {/* Layer + Abstraction */}
               <div className="form-row">
                 <div className="form-group">
-                  <FieldLabel htmlFor="entity-viewpoint" helpKey="viewpoint">Viewpoint</FieldLabel>
+                  <FieldLabel htmlFor="entity-viewpoint" helpKey="viewpoint">Layer</FieldLabel>
                   <select id="entity-viewpoint" value={formViewpoint} onChange={(e) => setFormViewpoint(e.target.value as Viewpoint)}>
                     {CONCRETE_VIEWPOINTS.map((vp) => (
                       <option key={vp} value={vp}>{vp.charAt(0).toUpperCase() + vp.slice(1)}</option>
@@ -554,7 +582,7 @@ export const EntityForm: React.FC = () => {
                   </select>
                 </div>
                 <div className="form-group">
-                  <FieldLabel htmlFor="entity-zoom" helpKey="zoomLevel">C4 Zoom Level</FieldLabel>
+                  <FieldLabel htmlFor="entity-zoom" helpKey="zoomLevel">Abstraction</FieldLabel>
                   <select id="entity-zoom" value={formZoomLevel} onChange={(e) => setFormZoomLevel(e.target.value as ZoomLevel)}>
                     {ALL_ZOOM_LEVELS.map((z) => (
                       <option key={z} value={z}>{z.charAt(0).toUpperCase() + z.slice(1)}</option>
@@ -744,11 +772,21 @@ export const EntityForm: React.FC = () => {
                 </div>
               )}
 
-              {/* Owner */}
+              {/* Ownership: Manager · Organization · SME */}
               {showOwner && (
-                <div className="form-group">
-                  <FieldLabel htmlFor="entity-owner" helpKey="owner">Owner</FieldLabel>
-                  <input id="entity-owner" type="text" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Team or person" />
+                <div className="form-row">
+                  <div className="form-group">
+                    <FieldLabel htmlFor="entity-owner" helpKey="owner">Owner (Manager)</FieldLabel>
+                    <input id="entity-owner" type="text" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="e.g. Sarah Chen" />
+                  </div>
+                  <div className="form-group flex-2">
+                    <FieldLabel htmlFor="entity-organization" helpKey="organization">Organization</FieldLabel>
+                    <input id="entity-organization" type="text" value={organization} onChange={(e) => setOrganization(e.target.value)} placeholder="e.g. Loyalty Core Squad" />
+                  </div>
+                  <div className="form-group">
+                    <FieldLabel htmlFor="entity-sme" helpKey="sme">SME</FieldLabel>
+                    <input id="entity-sme" type="text" value={sme} onChange={(e) => setSme(e.target.value)} placeholder="e.g. Marco Rossi" />
+                  </div>
                 </div>
               )}
 

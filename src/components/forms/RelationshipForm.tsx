@@ -24,6 +24,7 @@ export const RelationshipForm: React.FC = () => {
   const [label, setLabel] = useState('');
   const [protocol, setProtocol] = useState('');
   const [description, setDescription] = useState('');
+  const [routing, setRouting] = useState<'ORTHOGONAL' | 'POLYLINE' | ''>('');
   const [errors, setErrors] = useState<string[]>([]);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -36,6 +37,7 @@ export const RelationshipForm: React.FC = () => {
       setLabel(editingRel.label);
       setProtocol(editingRel.protocol ?? '');
       setDescription(editingRel.description ?? '');
+      setRouting(editingRel.routing ?? '');
     } else if (showForm && !editingRel) {
       resetForm();
       // Pre-fill source/target when opened via drag-to-connect
@@ -77,7 +79,7 @@ export const RelationshipForm: React.FC = () => {
 
   function resetForm() {
     setSourceId(''); setTargetId(''); setType('sync'); setLabel('');
-    setProtocol(''); setDescription(''); setErrors([]);
+    setProtocol(''); setDescription(''); setRouting(''); setErrors([]);
   }
 
   function validate(): boolean {
@@ -102,6 +104,7 @@ export const RelationshipForm: React.FC = () => {
         label,
         protocol: protocol || undefined,
         description: description || undefined,
+        routing: routing || undefined,
       });
     } else {
       addRelationship({
@@ -111,6 +114,7 @@ export const RelationshipForm: React.FC = () => {
         label,
         ...(protocol && { protocol }),
         ...(description && { description }),
+        ...(routing && { routing }),
       });
     }
 
@@ -191,6 +195,14 @@ export const RelationshipForm: React.FC = () => {
             <div className="form-group">
               <label htmlFor="rel-protocol">Protocol</label>
               <input id="rel-protocol" type="text" value={protocol} onChange={(e) => setProtocol(e.target.value)} placeholder="e.g. HTTPS, gRPC" />
+            </div>
+            <div className="form-group">
+              <label htmlFor="rel-routing">Routing</label>
+              <select id="rel-routing" value={routing} onChange={(e) => setRouting(e.target.value as 'ORTHOGONAL' | 'POLYLINE' | '')}>
+                <option value="">— Inherit global —</option>
+                <option value="ORTHOGONAL">Orthogonal (elbow)</option>
+                <option value="POLYLINE">Polyline (straight)</option>
+              </select>
             </div>
             <div className="form-group flex-2">
               <label htmlFor="rel-desc">Description</label>

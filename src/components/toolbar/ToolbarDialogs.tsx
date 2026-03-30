@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Heart, X } from 'lucide-react';
+import { Heart, X, Layers, Zap, GitBranch, Box } from 'lucide-react';
 
 interface ToolbarDialogsProps {
   showHelp: boolean;
   onCloseHelp: () => void;
+  showAbout: boolean;
+  onCloseAbout: () => void;
   showSupport: boolean;
   onCloseSupport: () => void;
   showContact: boolean;
@@ -12,6 +14,7 @@ interface ToolbarDialogsProps {
 
 export const ToolbarDialogs: React.FC<ToolbarDialogsProps> = ({
   showHelp, onCloseHelp,
+  showAbout, onCloseAbout,
   showSupport, onCloseSupport,
   showContact, onCloseContact,
 }) => {
@@ -67,14 +70,14 @@ export const ToolbarDialogs: React.FC<ToolbarDialogsProps> = ({
 
               <h4 className="help-shortcut-group">Navigation</h4>
               <div className="help-shortcuts">
-                <div className="help-shortcut"><kbd>1</kbd> <span>Select System Context level</span></div>
-                <div className="help-shortcut"><kbd>2</kbd> <span>Select Container level</span></div>
-                <div className="help-shortcut"><kbd>3</kbd> <span>Select Component level</span></div>
-                <div className="help-shortcut"><kbd>Shift 1/2/3</kbd> <span>Add level to multi-view</span></div>
-                <div className="help-shortcut"><kbd>B</kbd> <span>Select Business viewpoint</span></div>
-                <div className="help-shortcut"><kbd>A</kbd> <span>Select Application viewpoint</span></div>
-                <div className="help-shortcut"><kbd>T</kbd> <span>Select Technology viewpoint</span></div>
-                <div className="help-shortcut"><kbd>Shift B/A/T</kbd> <span>Add viewpoint to multi-view</span></div>
+                <div className="help-shortcut"><kbd>1</kbd> <span>Select System Context abstraction</span></div>
+                <div className="help-shortcut"><kbd>2</kbd> <span>Select Container abstraction</span></div>
+                <div className="help-shortcut"><kbd>3</kbd> <span>Select Component abstraction</span></div>
+                <div className="help-shortcut"><kbd>Shift 1/2/3</kbd> <span>Add abstraction to multi-view</span></div>
+                <div className="help-shortcut"><kbd>B</kbd> <span>Select Business layer</span></div>
+                <div className="help-shortcut"><kbd>A</kbd> <span>Select Application layer</span></div>
+                <div className="help-shortcut"><kbd>T</kbd> <span>Select Technology layer</span></div>
+                <div className="help-shortcut"><kbd>Shift B/A/T</kbd> <span>Add layer to multi-view</span></div>
                 <div className="help-shortcut"><kbd>Escape</kbd> <span>Close dialog / exit immersive</span></div>
               </div>
 
@@ -92,14 +95,62 @@ export const ToolbarDialogs: React.FC<ToolbarDialogsProps> = ({
                 <div className="help-shortcut"><kbd>F5</kbd> <span>Presentation mode</span></div>
                 <div className="help-shortcut"><kbd>F11</kbd> <span>Distraction-free mode</span></div>
               </div>
-              <h3 style={{ marginTop: 16 }}>About</h3>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                ArchLens is a C4-model compliant architecture modeling platform.
-                It supports zoom levels (System Context, Container, Component, Code).
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* About dialog */}
+      {showAbout && (
+        <div className="modal-overlay" onClick={onCloseAbout} role="presentation">
+          <div className="modal-content modal-content--about" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="about-title">
+            <div className="modal-header">
+              <h2 id="about-title">About ArchLens</h2>
+              <button className="btn-icon" onClick={onCloseAbout} aria-label="Close"><X size={18} /></button>
+            </div>
+            <div className="about-content">
+              <div className="about-hero">
+                <span className="about-logo-icon">◈</span>
+                <div className="about-title-block">
+                  <h3 className="about-product-name">ArchLens</h3>
+                  <span className="about-tagline">Visual Architecture Design Tool</span>
+                </div>
+              </div>
+              <p className="about-version">Version 1.0.0</p>
+              <p className="about-description">
+                Model your software architecture once and explore it through multiple
+                lenses. Switch between C4 containment hierarchy and ArchiMate layered
+                swimlanes — same model, different projections.
               </p>
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-                Version 1.0.0
-              </p>
+              <div className="about-features">
+                <div className="about-feature">
+                  <Layers size={16} className="about-feature-icon" />
+                  <span>C4 Model &amp; ArchiMate diagrams</span>
+                </div>
+                <div className="about-feature">
+                  <Zap size={16} className="about-feature-icon" />
+                  <span>Auto-layout powered by ELK</span>
+                </div>
+                <div className="about-feature">
+                  <GitBranch size={16} className="about-feature-icon" />
+                  <span>Multi-layer architecture</span>
+                </div>
+                <div className="about-feature">
+                  <Box size={16} className="about-feature-icon" />
+                  <span>Export to SVG, PNG &amp; JSON</span>
+                </div>
+              </div>
+              <div className="about-built-with">
+                <span className="about-built-label">Built with</span>
+                <div className="about-tech-chips">
+                  <span className="about-tech-chip">React</span>
+                  <span className="about-tech-chip">TypeScript</span>
+                  <span className="about-tech-chip">ELK</span>
+                  <span className="about-tech-chip">Zustand</span>
+                  <span className="about-tech-chip">Vite</span>
+                </div>
+              </div>
+              <p className="about-copyright">© {new Date().getFullYear()} ArchLens. Open-source, free forever.</p>
             </div>
           </div>
         </div>

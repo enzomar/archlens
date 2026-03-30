@@ -251,7 +251,7 @@ export const CanvasLegend: React.FC<CanvasLegendProps> = ({ visibleKinds, visibl
           <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 6 }}>Key</div>
           {isGlobalView && (
             <div style={{ marginBottom: 6 }}>
-              <div style={{ fontWeight: 600, fontSize: 10, marginBottom: 3, color: 'var(--text-secondary, #636E72)' }}>Viewpoints</div>
+              <div style={{ fontWeight: 600, fontSize: 10, marginBottom: 3, color: 'var(--text-secondary, #636E72)' }}>Layers</div>
               {CONCRETE_VIEWPOINTS.map((vp) => (
                 <div key={vp} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                   <span style={{

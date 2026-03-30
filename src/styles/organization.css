@@ -74,6 +74,623 @@
   color: var(--text-tertiary);
 }
 
+/* Scrollable content */
+.org-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+}
+
+/* ── Org Chart Tab ─────────────────────────────────────── */
+
+.oc-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.oc-summary-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.oc-summary-stat {
+  color: var(--text-secondary);
+}
+
+.oc-summary-stat strong {
+  color: var(--text-primary);
+}
+
+.oc-summary-sep {
+  opacity: 0.4;
+}
+
+.oc-focus-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.oc-focus-clear {
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.oc-focus-clear:hover {
+  color: var(--danger, #E84393);
+}
+
+.oc-chart {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  padding: 24px 20px 32px;
+  overflow-x: auto;
+  align-items: flex-start;
+  flex: 1;
+  min-height: 0;
+}
+
+.oc-branch-wrapper {
+  cursor: pointer;
+}
+
+/* ── Owner Branch ──────────────────────────────────────── */
+.oc-branch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 210px;
+  max-width: 240px;
+  transition: opacity 0.2s;
+}
+
+.oc-branch--highlight {
+  /* fully visible when highlighted or no selection */
+  opacity: 1;
+}
+
+.oc-branch-wrapper:not(:has(.oc-branch--highlight)) .oc-branch {
+  opacity: 0.35;
+}
+
+.oc-owner {
+  width: 100%;
+  background: var(--surface-raised, var(--surface));
+  border: 1px solid var(--border);
+  border-top: 3px solid transparent;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  transition: box-shadow 0.15s, transform 0.1s;
+  position: relative;
+}
+
+.oc-branch-wrapper:hover .oc-owner {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.oc-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  letter-spacing: -0.5px;
+}
+
+.oc-owner-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.oc-owner-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+
+.oc-owner-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 1px;
+}
+
+.oc-owner-meta--sme {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.oc-owner-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.oc-stat-count {
+  color: var(--text-tertiary);
+}
+
+.oc-stat-warn {
+  color: var(--warning, #FDCB6E);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.oc-vp-bar {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.oc-vp-segment {
+  min-width: 4px;
+  border-radius: 1px;
+}
+
+.oc-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.oc-collapse-btn:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+/* ── Connector stem ────────────────────────────────────── */
+.oc-stem {
+  width: 0;
+  height: 20px;
+  border-left: 2px dashed transparent;
+  margin: 0 auto;
+}
+
+/* ── Entity Cards ──────────────────────────────────────── */
+.oc-entities {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.oc-entity-card {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s, box-shadow 0.1s, transform 0.1s;
+  position: relative;
+}
+
+.oc-entity-card:hover {
+  background: var(--hover);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transform: translateX(2px);
+}
+
+.oc-entity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.oc-entity-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.oc-entity-kind {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 72px;
+  flex-shrink: 0;
+}
+
+.oc-entity-maturity {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.oc-maturity--dev     { background: #a29bfe22; color: #a29bfe; }
+.oc-maturity--intro   { background: #74b9ff22; color: #74b9ff; }
+.oc-maturity--grow    { background: #00b89422; color: #00b894; }
+.oc-maturity--mature  { background: #6c5ce722; color: #6c5ce7; }
+.oc-maturity--decline { background: #d63e5122; color: #d63e51; }
+
+.oc-entity-edit {
+  display: none;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.oc-entity-card:hover .oc-entity-edit {
+  display: flex;
+}
+
+.oc-entity-edit:hover {
+  color: var(--accent);
+  background: var(--hover);
+}
+
+/* Collapsed pill */
+.oc-collapsed-pill {
+  margin-top: 4px;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+/* Empty state */
+.oc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 64px 24px;
+  color: var(--text-tertiary);
+  text-align: center;
+  flex: 1;
+}
+
+.oc-empty p {
+  font-size: 13px;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+/* ── Domain / Hierarchy tabs (unchanged) ───────────────── */
+
+/* Collapsible section */
+.org-section {
+  border-radius: 6px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.org-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: var(--surface-raised, var(--surface));
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.org-section-header:hover {
+  background: var(--hover);
+}
+
+.org-section-title {
+  flex: 1;
+}
+
+.org-section-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: var(--hover);
+  padding: 1px 6px;
+  border-radius: 8px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.org-section-body {
+  padding: 4px 8px 8px;
+}
+
+/* Sub-groups */
+.org-sub-group {
+  margin: 4px 0;
+}
+
+.org-sub-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-left: 3px solid var(--border);
+}
+
+.org-sub-group-label {
+  flex: 1;
+}
+
+/* Entity row */
+.org-entity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.org-entity-row:hover {
+  background: var(--hover);
+}
+
+.org-entity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.org-entity-name {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.org-kind-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.org-entity-tech {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.org-edit-btn {
+  display: none;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+}
+
+.org-entity-row:hover .org-edit-btn {
+  display: flex;
+}
+
+.org-edit-btn:hover {
+  color: var(--accent);
+  background: var(--hover);
+}
+
+/* Tree hierarchy */
+.org-tree-node {
+  /* depth indentation applied inline */
+}
+
+.org-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px;
+  border-radius: 4px;
+}
+
+.org-tree-row:hover {
+  background: var(--hover);
+}
+
+.org-tree-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.org-tree-toggle:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+.org-tree-spacer {
+  width: 18px;
+  flex-shrink: 0;
+}
+
+.org-tree-label {
+  cursor: pointer;
+}
+
+.org-tree-label:hover {
+  color: var(--accent);
+}
+
+.org-tree-children {
+  /* children indent handled by parent padding-left */
+}
+
+/* Empty state (for domain/hierarchy tabs) */
+.org-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px 24px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+
+.org-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* Header: tabs + search */
+.org-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-raised, var(--surface));
+  flex-shrink: 0;
+}
+
+.org-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.org-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.org-tab:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+.org-tab--active {
+  background: var(--accent-muted, color-mix(in srgb, var(--accent) 14%, transparent));
+  color: var(--accent);
+}
+
+.org-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-tertiary);
+}
+
+.org-search {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-primary);
+  width: 160px;
+}
+
+.org-search::placeholder {
+  color: var(--text-tertiary);
+}
+
 /* Summary bar */
 .org-summary {
   display: flex;
@@ -302,3 +919,258 @@
   margin: 0;
   font-size: 13px;
 }
+
+/* ── People Tree (Hierarchy tab) ───────────────────────── */
+
+.pt-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 0;
+}
+
+.pt-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px 10px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.pt-node {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  margin-bottom: 6px;
+}
+
+/* Vertical connector line from parent */
+.pt-connector {
+  position: absolute;
+  left: 22px;
+  top: -8px;
+  height: 16px;
+  width: 0;
+  border-left: 2px dashed;
+  opacity: 0.5;
+}
+
+/* Person card */
+.pt-card {
+  border: 1px solid var(--border);
+  border-top-width: 2px;
+  border-radius: 6px;
+  background: var(--surface-raised, var(--surface));
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+
+.pt-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.pt-card-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.pt-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pt-person-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pt-person-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 1px;
+}
+
+.pt-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+.pt-badge--owner {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.pt-badge--sme {
+  background: color-mix(in srgb, #FDCB6E 15%, transparent);
+  color: #c8970a;
+  border: 1px solid color-mix(in srgb, #FDCB6E 40%, transparent);
+}
+
+.pt-org {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pt-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+
+.pt-vp-bar {
+  display: flex;
+  gap: 2px;
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  max-width: 160px;
+}
+
+.pt-vp-seg {
+  border-radius: 1px;
+}
+
+.pt-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pt-toggle-btn:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+/* Entity list inside person card */
+.pt-entities {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.pt-entity-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 16px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.1s;
+}
+
+.pt-entity-row:hover {
+  background: var(--hover);
+}
+
+.pt-entity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pt-entity-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.pt-entity-kind {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.pt-entity-sme {
+  font-size: 10px;
+  color: #c8970a;
+  flex-shrink: 0;
+}
+
+.pt-entity-edit {
+  display: none;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.pt-entity-row:hover .pt-entity-edit {
+  display: flex;
+  align-items: center;
+}
+
+/* Children section */
+.pt-children {
+  margin-top: 4px;
+  margin-left: 20px;
+}
+
+.pt-children-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.pt-children-toggle:hover {
+  background: var(--hover);
+  color: var(--text-primary);
+}
+
+.pt-children-body {
+  border-left: 2px solid;
+  padding-left: 12px;
+  margin-left: 8px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+

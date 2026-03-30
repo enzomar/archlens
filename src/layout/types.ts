@@ -34,4 +34,6 @@ export interface LayoutResult {
   containmentBoxes?: ContainmentBox[];
   labelWidth?: number;
   orientation?: LayoutMode;
+  /** Maps entity ID → viewpoint band it belongs to (ArchiMate only). */
+  bandMap?: Record<string, Viewpoint>;
 }

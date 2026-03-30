@@ -403,7 +403,7 @@ export const ShapePalette: React.FC = () => {
                     className={`palette-item ${disabled ? 'palette-item--disabled' : ''}`}
                     draggable={!disabled}
                     onDragStart={disabled ? undefined : (e) => handleDragStart(e, item)}
-                    title={disabled ? `${item.label} is not available at ${zoomLevel} zoom level` : `Drag to add ${item.label}`}
+                    title={disabled ? `${item.label} is not available at ${zoomLevel} abstraction` : `Drag to add ${item.label}`}
                   >
                     <ShapeThumbnail item={item} disabled={disabled} />
                     <span className="palette-item-label">{item.label}</span>

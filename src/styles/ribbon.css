@@ -90,8 +90,8 @@
 .ribbon-body {
   display: flex;
   align-items: stretch;
-  height: 46px;
-  padding: 4px 10px;
+  height: 56px;
+  padding: 4px 10px 0;
   gap: 0;
   overflow-x: auto;
 }
@@ -415,7 +415,17 @@
 }
 
 .ribbon-group-label {
-  display: none;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  white-space: nowrap;
+  padding-top: 1px;
+  padding-bottom: 2px;
+  user-select: none;
 }
 
 .ribbon-separator {
@@ -637,7 +647,9 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Context Control Bar — C4 Level + ArchiMate Layer toggle chips
+   Context Control Bar — VIEW MODES STRATEGY
+   Two modes: C4-First (hierarchy primary) / ArchiMate-First (layers primary)
+   Mode switcher first; primary controls bold; secondary controls dimmed.
    ═══════════════════════════════════════════════════════════════ */
 
 .ccb {
@@ -647,16 +659,80 @@
   padding: 4px 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  min-height: 32px;
+  min-height: 34px;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+/* Subtle tint per active mode */
+.ccb--c4   { background: var(--surface); }
+.ccb--archi { background: color-mix(in srgb, var(--surface) 97%, var(--accent) 3%); }
+
+/* ── Mode switcher ──────────────────────────────────────────── */
+.ccb-mode-switcher {
+  display: flex;
+  gap: 1px;
+  background: var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
   flex-shrink: 0;
 }
 
-/* ── Group (label + chips) ─ */
+.ccb-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border: none;
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1.3;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.ccb-mode-btn:hover { background: var(--surface); color: var(--text); }
+
+.ccb-mode-btn--active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ccb-mode-btn--active:hover { background: color-mix(in srgb, var(--accent) 88%, black); }
+
+.ccb-mode-icon { font-size: 13px; line-height: 1; flex-shrink: 0; }
+
+.ccb-mode-label { font-weight: 700; }
+
+.ccb-mode-sub {
+  font-size: 9.5px;
+  font-weight: 500;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ccb-mode-btn--active .ccb-mode-sub { opacity: 0.85; }
+
+/* ── Group (label + chips) ─────────────────────────────────── */
 .ccb-group {
   display: flex;
   align-items: center;
   gap: 4px;
 }
+
+/* Primary group: full opacity */
+.ccb-group--primary { opacity: 1; }
+
+/* Secondary group: dimmed — this dimension is represented visually on nodes */
+.ccb-group--secondary { opacity: 0.72; }
+.ccb-group--secondary:hover { opacity: 0.85; }
+.ccb-group--secondary .ccb-group-label::after { content: '*'; margin-left: 1px; }
 
 .ccb-group-label {
   font-size: 10px;
@@ -722,9 +798,7 @@
   opacity: 0.7;
 }
 
-.ccb-chip--on .ccb-chip-icon {
-  opacity: 1;
-}
+.ccb-chip--on .ccb-chip-icon { opacity: 1; }
 
 /* ── Viewpoint chip dot (ArchiMate color swatch) ── */
 .ccb-chip-dot {
@@ -736,40 +810,285 @@
 }
 
 /* Business */
-.ccb-chip--business .ccb-chip-dot {
-  background: var(--viewpoint-business);
-}
+.ccb-chip--business .ccb-chip-dot { background: var(--viewpoint-business); }
 .ccb-chip--business.ccb-chip--on {
   border-color: var(--viewpoint-business);
   background: var(--viewpoint-business-bg);
   color: var(--viewpoint-business);
 }
-.ccb-chip--business.ccb-chip--on:hover {
-  border-color: var(--viewpoint-business);
-}
+.ccb-chip--business.ccb-chip--on:hover { border-color: var(--viewpoint-business); }
 
 /* Application */
-.ccb-chip--application .ccb-chip-dot {
-  background: var(--viewpoint-application);
-}
+.ccb-chip--application .ccb-chip-dot { background: var(--viewpoint-application); }
 .ccb-chip--application.ccb-chip--on {
   border-color: var(--viewpoint-application);
   background: var(--viewpoint-application-bg);
   color: var(--viewpoint-application);
 }
-.ccb-chip--application.ccb-chip--on:hover {
-  border-color: var(--viewpoint-application);
-}
+.ccb-chip--application.ccb-chip--on:hover { border-color: var(--viewpoint-application); }
 
 /* Technology */
-.ccb-chip--technology .ccb-chip-dot {
-  background: var(--viewpoint-technology);
-}
+.ccb-chip--technology .ccb-chip-dot { background: var(--viewpoint-technology); }
 .ccb-chip--technology.ccb-chip--on {
   border-color: var(--viewpoint-technology);
   background: var(--viewpoint-technology-bg);
   color: var(--viewpoint-technology);
 }
-.ccb-chip--technology.ccb-chip--on:hover {
-  border-color: var(--viewpoint-technology);
+.ccb-chip--technology.ccb-chip--on:hover { border-color: var(--viewpoint-technology); }
+
+/* ── Live context sentence ── */
+.ccb-context-sentence {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 6px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.ccb-context-sentence em {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   File Menu Dropdown
+   ═══════════════════════════════════════════════════════════════ */
+
+.ribbon-file-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ribbon-tab--file {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.file-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 300;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px 0;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  border: none;
+  background: none;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-family: var(--font);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.file-menu-item:hover {
+  background: var(--surface-alt);
+}
+
+.file-menu-item:active {
+  background: var(--border);
+}
+
+.file-menu-item svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.file-menu-shortcut {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+}
+
+.file-menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Settings Dropdown
+   ═══════════════════════════════════════════════════════════════ */
+
+.ribbon-settings-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.settings-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 300;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 12px 14px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-row--btns {
+  gap: 3px;
+}
+
+.settings-toggle {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 38px;
+  text-align: center;
+}
+
+.settings-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.settings-toggle--on {
+  background: var(--accent-bg);
+  border-color: var(--accent-light);
+  color: var(--accent);
+}
+
+.settings-num {
+  width: 52px;
+  padding: 3px 5px;
+  font-size: 11px;
+  font-family: var(--font);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+  color: var(--text);
+  text-align: center;
+}
+
+.settings-num:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-num:disabled {
+  opacity: 0.4;
+}
+
+.settings-unit {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.settings-icon {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.settings-slider {
+  flex: 1;
+  min-width: 80px;
+  height: 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.settings-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.settings-pill:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface-alt);
+}
+
+.settings-pill--active {
+  background: var(--accent-bg);
+  border-color: var(--accent-light);
+  color: var(--accent);
+}
+
+/* ── Heart button accent ── */
+.ribbon-btn--heart .ribbon-btn-icon {
+  color: #E74C3C;
+}
+
+.ribbon-btn--heart .ribbon-btn-icon svg {
+  animation: heart-pulse 1.5s ease-in-out infinite;
+}
+
+.ribbon-btn--heart:hover .ribbon-btn-icon svg {
+  animation: none;
+  transform: scale(1.3);
+}
+
+@keyframes heart-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
 }

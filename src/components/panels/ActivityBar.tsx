@@ -2,7 +2,7 @@ import React from 'react';
 import { useStore } from '../../store/useStore';
 import {
   FileSearch, LayoutPanelLeft, Terminal, PanelRight,
-  Search, Settings, GitBranch, List,
+  List,
 } from 'lucide-react';
 
 interface ActivityBarProps {
@@ -31,22 +31,6 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({ side }) => {
             aria-pressed={leftSidebarOpen}
           >
             <FileSearch size={22} />
-          </button>
-          <button
-            className="activity-bar-btn"
-            title="Search (coming soon)"
-            aria-label="Search"
-            disabled
-          >
-            <Search size={22} />
-          </button>
-          <button
-            className="activity-bar-btn"
-            title="Source Control (coming soon)"
-            aria-label="Source Control"
-            disabled
-          >
-            <GitBranch size={22} />
           </button>
           <button
             className={`activity-bar-btn ${viewMode === 'list' ? 'activity-bar-btn--active' : ''}`}
@@ -97,14 +81,6 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({ side }) => {
         </button>
       </div>
       <div className="activity-bar-bottom">
-        <button
-          className="activity-bar-btn"
-          title="Settings (coming soon)"
-          aria-label="Settings"
-          disabled
-        >
-          <Settings size={22} />
-        </button>
       </div>
     </div>
   );

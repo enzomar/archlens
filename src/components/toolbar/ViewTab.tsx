@@ -1,40 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React from 'react';
 import { useStore } from '../../store/useStore';
-import {
-  ALL_MATURITIES, ALL_DEPLOYMENT_STAGES, ALL_PREDEFINED_TAGS,
-  KIND_COLORS, MATURITY_COLORS, getKindsForViewpointLevel,
-} from '../../domain/types';
-import type { EntityKind, Maturity, DeploymentStage, PredefinedTag, ViewMode } from '../../domain/types';
-import { Target, Maximize2, SlidersHorizontal, X, LayoutList, Map, ShieldCheck, Layers, AlignJustify, ScanSearch, Network, BarChart3, Building2 } from 'lucide-react';
-
-const KIND_LABELS: Record<EntityKind, string> = {
-  person: 'Person', system: 'System', container: 'Container', component: 'Component',
-  artifact: 'Artifact', trigger: 'Trigger', aimodel: 'AI Model',
-  vectorstore: 'Vector Store', retriever: 'Retriever', evaluation: 'Evaluation',
-  'business-actor': 'Biz Actor', 'business-role': 'Biz Role',
-  'business-process': 'Biz Process', 'business-service': 'Biz Service',
-  'business-object': 'Biz Object', 'business-event': 'Biz Event',
-  'business-interface': 'Biz Interface', contract: 'Contract',
-  'application-component': 'App Comp', 'application-service': 'App Service',
-  'application-function': 'App Func', 'application-interface': 'App Iface',
-  'application-process': 'App Process', 'data-object': 'Data Obj',
-  node: 'Node', device: 'Device', 'system-software': 'Sys Software',
-  'technology-service': 'Tech Service', 'communication-network': 'Network',
-  'technology-interface': 'Tech Iface',
-  capability: 'Capability', stakeholder: 'Stakeholder', goal: 'Goal', requirement: 'Requirement',
-};
-
-const MATURITY_LABELS: Record<Maturity, string> = {
-  DEV: 'Dev', INTRO: 'Intro', GROW: 'Grow', MATURE: 'Mature', DECLINE: 'Decline',
-};
-
-const STAGE_LABELS: Record<DeploymentStage, string> = {
-  LOCAL: 'Local', TESTING: 'Testing', PRODUCTION: 'Prod',
-};
+import { Target, Maximize2, LayoutList, Map, ShieldCheck, Layers, AlignJustify, ScanSearch, Network, BarChart3, Building2, Bookmark } from 'lucide-react';
 
 export const ViewTab: React.FC = () => {
-  const filters    = useStore((s) => s.filters);
-  const setFilters = useStore((s) => s.setFilters);
   const setScale        = useStore((s) => s.setScale);
   const setPan          = useStore((s) => s.setPan);
   const viewMode       = useStore((s) => s.viewMode);
@@ -46,59 +14,11 @@ export const ViewTab: React.FC = () => {
   const showViewsPanel        = useStore((s) => s.showViewsPanel);
   const logPanelOpen          = useStore((s) => s.logPanelOpen);
   const inspectMode           = useStore((s) => s.inspectMode);
-  const activeZoomLevels      = useStore((s) => s.activeZoomLevels);
-  const activeViewpoints      = useStore((s) => s.activeViewpoints);
   const toggleShowMinimap         = useStore((s) => s.toggleShowMinimap);
   const toggleShowValidationPanel = useStore((s) => s.toggleShowValidationPanel);
   const toggleShowViewsPanel      = useStore((s) => s.toggleShowViewsPanel);
   const toggleLogPanel            = useStore((s) => s.toggleLogPanel);
   const toggleInspectMode         = useStore((s) => s.toggleInspectMode);
-
-  const [filterOpen, setFilterOpen] = useState(false);
-  const filterBtnRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef  = useRef<HTMLDivElement>(null);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!filterOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        !dropdownRef.current?.contains(e.target as Node) &&
-        !filterBtnRef.current?.contains(e.target as Node)
-      ) setFilterOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [filterOpen]);
-
-  const contextKinds     = [...new Set(
-    activeViewpoints.flatMap((vp) => activeZoomLevels.flatMap((zl) => getKindsForViewpointLevel(vp, zl)))
-  )] as EntityKind[];
-  const activeKinds      = filters.kinds ?? [];
-  const activeMaturities = filters.maturities ?? [];
-  const activeStages     = filters.deploymentStages ?? [];
-  const activeTags       = filters.tags ?? [];
-
-  const filterCount =
-    activeKinds.length + activeMaturities.length + activeStages.length + activeTags.length;
-
-  const toggle = <T extends string>(
-    active: T[], value: T,
-    mapKey: (arr: T[]) => Partial<typeof filters>
-  ) => {
-    const cur = new Set(active);
-    cur.has(value) ? cur.delete(value) : cur.add(value);
-    setFilters({ ...filters, ...mapKey([...cur]) });
-  };
-
-  const toggleKind      = (k: EntityKind)        => toggle(activeKinds, k,
-    (arr) => ({ kinds: arr.length > 0 ? arr : undefined }));
-  const toggleMaturity  = (m: Maturity)           => toggle(activeMaturities, m,
-    (arr) => ({ maturities: arr.length > 0 ? arr : undefined }));
-  const toggleStage     = (s: DeploymentStage)    => toggle(activeStages, s,
-    (arr) => ({ deploymentStages: arr.length > 0 ? arr : undefined }));
-  const toggleTag       = (t: PredefinedTag)      => toggle(activeTags, t,
-    (arr) => ({ tags: arr.length > 0 ? arr : undefined }));
 
   return (
     <>
@@ -146,7 +66,7 @@ export const ViewTab: React.FC = () => {
             <span className="ribbon-btn-label">Organization</span>
           </button>
         </div>
-        <span className="ribbon-group-label">Mode</span>
+        <span className="ribbon-group-label">View</span>
       </div>
 
       <div className="ribbon-separator" />
@@ -174,99 +94,6 @@ export const ViewTab: React.FC = () => {
           </button>
         </div>
         <span className="ribbon-group-label">Camera</span>
-      </div>
-
-      <div className="ribbon-separator" />
-
-      {/* ── Filters ──────────────────────────────── */}
-      <div className="ribbon-group" style={{ position: 'relative' }}>
-        <div className="ribbon-group-buttons">
-          <button
-            ref={filterBtnRef}
-            className={`ribbon-btn${filterOpen ? ' ribbon-btn--active' : ''}${filterCount > 0 ? ' ribbon-btn--filtered' : ''}`}
-            onClick={() => setFilterOpen((o) => !o)}
-            title="Toggle filters"
-          >
-            <span className="ribbon-btn-icon" style={{ position: 'relative' }}>
-              <SlidersHorizontal size={20} />
-              {filterCount > 0 && (
-                <span className="filter-badge">{filterCount}</span>
-              )}
-            </span>
-            <span className="ribbon-btn-label">Filter{filterCount > 0 ? ` (${filterCount})` : ''}</span>
-          </button>
-
-          {filterCount > 0 && (
-            <button
-              className="ribbon-btn ribbon-btn--warning"
-              onClick={() => setFilters({})}
-              title="Clear all filters"
-            >
-              <span className="ribbon-btn-icon"><X size={20} /></span>
-              <span className="ribbon-btn-label">Clear</span>
-            </button>
-          )}
-        </div>
-        <span className="ribbon-group-label">Filters</span>
-
-        {/* Dropdown panel */}
-        {filterOpen && (
-          <div ref={dropdownRef} className="filter-dropdown">
-            <FilterSection label="Kind">
-              {contextKinds.map((k) => (
-                <FilterChip
-                  key={k}
-                  label={KIND_LABELS[k]}
-                  active={activeKinds.includes(k)}
-                  color={KIND_COLORS[k]}
-                  onClick={() => toggleKind(k)}
-                />
-              ))}
-            </FilterSection>
-
-            <FilterSection label="Maturity">
-              {ALL_MATURITIES.map((m) => (
-                <FilterChip
-                  key={m}
-                  label={MATURITY_LABELS[m]}
-                  active={activeMaturities.includes(m)}
-                  color={MATURITY_COLORS[m]}
-                  onClick={() => toggleMaturity(m)}
-                />
-              ))}
-            </FilterSection>
-
-            <FilterSection label="Stage">
-              {ALL_DEPLOYMENT_STAGES.map((s) => (
-                <FilterChip
-                  key={s}
-                  label={STAGE_LABELS[s]}
-                  active={activeStages.includes(s)}
-                  onClick={() => toggleStage(s)}
-                />
-              ))}
-            </FilterSection>
-
-            <FilterSection label="Tags">
-              {ALL_PREDEFINED_TAGS.map((t) => (
-                <FilterChip
-                  key={t}
-                  label={t}
-                  active={activeTags.includes(t)}
-                  onClick={() => toggleTag(t)}
-                />
-              ))}
-            </FilterSection>
-
-            {filterCount > 0 && (
-              <div className="filter-dropdown-footer">
-                <button className="filter-clear-btn" onClick={() => { setFilters({}); setFilterOpen(false); }} title="Clear all active filters" aria-label="Clear all filters">
-                  Clear all {filterCount} filter{filterCount !== 1 ? 's' : ''}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       <div className="ribbon-separator" />
@@ -335,34 +162,62 @@ export const ViewTab: React.FC = () => {
         </div>
         <span className="ribbon-group-label">Debug</span>
       </div>
+
+      <div className="ribbon-separator" />
+
+      {/* ── View presets ─────────────────────────────── */}
+      <div className="ribbon-group">
+        <div className="ribbon-group-buttons">
+          <button
+            className="ribbon-btn"
+            onClick={() => {
+              const s = useStore.getState();
+              s.setViewMode('architecture');
+              s.setViewpoint('application');
+              s.setZoomLevel('container');
+              s.setSwimlaneOrientation('c4-nested');
+              s.autoLayout();
+            }}
+            title="Application containers as C4 Hierarchy"
+          >
+            <span className="ribbon-btn-icon"><Bookmark size={20} /></span>
+            <span className="ribbon-btn-label">Solution</span>
+          </button>
+          <button
+            className="ribbon-btn"
+            onClick={() => {
+              const s = useStore.getState();
+              s.setViewMode('architecture');
+              s.setViewpoint('application');
+              s.setZoomLevel('component');
+              s.setSwimlaneOrientation('c4-nested');
+              s.autoLayout();
+            }}
+            title="Application components as C4 Hierarchy"
+          >
+            <span className="ribbon-btn-icon"><Bookmark size={20} /></span>
+            <span className="ribbon-btn-label">Developer</span>
+          </button>
+          <button
+            className="ribbon-btn"
+            onClick={() => {
+              const s = useStore.getState();
+              s.setViewMode('architecture');
+              s.setSwimlaneOrientation('archimate-layered');
+              // Activate all viewpoints + context level for full landscape
+              s.setViewpoint('business');
+              s.toggleActiveViewpoint('application');
+              s.toggleActiveViewpoint('technology');
+              s.autoLayout();
+            }}
+            title="All layers as ArchiMate swimlanes"
+          >
+            <span className="ribbon-btn-icon"><Bookmark size={20} /></span>
+            <span className="ribbon-btn-label">Landscape</span>
+          </button>
+        </div>
+        <span className="ribbon-group-label">Presets</span>
+      </div>
     </>
   );
 };
-
-/* ── Sub-components ───────────────────────────────────────────── */
-
-const FilterSection: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <div className="filter-section">
-    <span className="filter-section-label">{label}</span>
-    <div className="filter-chips">{children}</div>
-  </div>
-);
-
-const FilterChip: React.FC<{
-  label: string;
-  active: boolean;
-  color?: string;
-  onClick: () => void;
-}> = ({ label, active, color, onClick }) => (
-  <button
-    className={`filter-chip${active ? ' filter-chip--active' : ''}`}
-    style={active && color ? { background: color, borderColor: color } : undefined}
-    onClick={onClick}
-    title={active ? `Remove filter: ${label}` : `Filter by: ${label}`}
-    aria-label={active ? `Remove filter: ${label}` : `Filter by: ${label}`}
-    aria-pressed={active}
-  >
-    {color && <span className="filter-chip-dot" style={{ background: color }} />}
-    {label}
-  </button>
-);

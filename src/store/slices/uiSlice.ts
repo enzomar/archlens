@@ -1,6 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import type { ViewFilters, VisualConfig, ThemeMode, NodePosition } from '../../domain/types';
-import { NODE_DIMENSIONS } from '../../domain/types';
+import type { ViewFilters, VisualConfig, ThemeMode, CanvasMode, HighlightShape } from '../../domain/types';
 import { computeElkLayout } from '../../layout/elkLayout';
 import type { LayoutResult, LayoutMode } from '../../layout/types';
 import type { StoreSet, StoreGet, LogEntry } from '../storeTypes';
@@ -34,12 +33,17 @@ export const createUiSlice = (set: StoreSet, get: StoreGet) => ({
   // ── Autosave settings ──────────────────────────────────
   autosaveEnabled: true,
   autosaveInterval: 30,          // seconds
+  zoomSensitivity: 0.08,         // 0.01 – 0.30
 
   // ── Canvas panel visibility ────────────────────────────
   showMinimap: true,
   showValidationPanel: true,
   showViewsPanel: true,
+  canvasMode: 'select' as CanvasMode,
   inspectMode: false,
+  highlightShapes: [] as HighlightShape[],
+  highlightShapeType: 'rect' as 'rect' | 'ellipse',
+  selectedHighlightId: null as string | null,
   expandedEntityIds: new Set<string>(),
 
   selectedNoteId: null as string | null,
@@ -137,7 +141,10 @@ export const createUiSlice = (set: StoreSet, get: StoreGet) => ({
 
   addLogEntry: (level: LogEntry['level'], message: string) => {
     const entry: LogEntry = { id: uuid(), timestamp: Date.now(), level, message };
-    set((s) => ({ logEntries: [...s.logEntries, entry] }));
+    set((s) => {
+      const next = [...s.logEntries, entry];
+      return { logEntries: next.length > 1000 ? next.slice(next.length - 1000) : next };
+    });
   },
 
   clearLog: () => set({ logEntries: [] }),
@@ -154,10 +161,13 @@ export const createUiSlice = (set: StoreSet, get: StoreGet) => ({
     const layoutEntities = visible;
 
     const lockedOnly = s.positions.filter((p) => p.locked);
-    const result = await computeElkLayout(layoutEntities, lockedOnly, s.visualConfig.nodeDisplayMode, visibleRels, s.activeViewpoints, s.activeZoomLevels, s.swimlaneOrientation, s.visualConfig.edgeRouting);
+    const result = await computeElkLayout(layoutEntities, lockedOnly, s.visualConfig.nodeDisplayMode, visibleRels, s.activeViewpoints, s.activeZoomLevels, s.swimlaneOrientation, s.visualConfig.edgeRoutingContainment);
     const newIds = new Set(result.positions.map((p) => p.entityId));
     const kept = s.positions.filter((p) => !newIds.has(p.entityId) && p.locked);
-    set({ positions: [...kept, ...result.positions], scale: 1, panX: 0, panY: 0, manualLayout: false, expandedEntityIds: new Set<string>(), lastLayoutResult: result });
+    // Preserve the user's current viewport (pan/scale) — mode switching and entity
+    // additions should not teleport the user. Initial load starts at (0,0,1) which
+    // already shows the diagram correctly since ELK places nodes near origin.
+    set({ positions: [...kept, ...result.positions], manualLayout: false, lastLayoutResult: result });
     get().addLogEntry('debug', `Auto-layout applied to ${layoutEntities.length} entities (strategy: ${result.strategy ?? 'default'})`);
   },
 
@@ -173,7 +183,16 @@ export const createUiSlice = (set: StoreSet, get: StoreGet) => ({
   toggleShowMinimap:          () => set((s) => ({ showMinimap: !s.showMinimap })),
   toggleShowValidationPanel:  () => set((s) => ({ showValidationPanel: !s.showValidationPanel })),
   toggleShowViewsPanel:       () => set((s) => ({ showViewsPanel: !s.showViewsPanel })),
-  toggleInspectMode:          () => set((s) => ({ inspectMode: !s.inspectMode })),
+  setCanvasMode:               (mode: CanvasMode) => set({ canvasMode: mode, inspectMode: mode === 'inspect' }),
+  toggleInspectMode:           () => set((s) => {
+    const next = s.canvasMode === 'inspect' ? 'select' : 'inspect';
+    return { canvasMode: next as CanvasMode, inspectMode: next === 'inspect' };
+  }),
+  setHighlightShapeType:        (t: 'rect' | 'ellipse') => set({ highlightShapeType: t }),
+  addHighlightShape:            (shape: HighlightShape) => set((s) => ({ highlightShapes: [...s.highlightShapes, shape] })),
+  removeHighlightShape:         (id: string) => set((s) => ({ highlightShapes: s.highlightShapes.filter((h) => h.id !== id), selectedHighlightId: s.selectedHighlightId === id ? null : s.selectedHighlightId })),
+  selectHighlight:              (id: string | null) => set({ selectedHighlightId: id }),
+  clearHighlightShapes:         () => set({ highlightShapes: [], selectedHighlightId: null }),
 
   // ── Expand in place ────────────────────────────────────────
   collapseAllEntities: () => set({ expandedEntityIds: new Set<string>() }),
@@ -199,41 +218,13 @@ export const createUiSlice = (set: StoreSet, get: StoreGet) => ({
           queue.push(child.id);
         }
       }
-      set({ expandedEntityIds: next });
     } else {
-      // EXPAND: add to set, pre-position children near their parent
+      // EXPAND: add to set — autoLayout will include the children
       next.add(id);
-      const parentPos = s.positions.find((p) => p.entityId === id);
-      const children = s.entities.filter((e) => e.parentId === id);
-      const posMap = new Map(s.positions.map((p) => [p.entityId, p]));
-      const newPositions: NodePosition[] = [...s.positions];
-
-      if (parentPos && children.length > 0) {
-        const COLS = Math.min(3, children.length);
-        const COL_GAP = 40;
-        const ROW_GAP = 40;
-        let unpositioned = children.filter((c) => !posMap.has(c.id));
-        let col = 0, row = 0;
-        // Estimate column width from first child's kind dimensions
-        const firstDims = NODE_DIMENSIONS[unpositioned[0]?.kind ?? 'container'] ?? { width: 160, height: 80 };
-        const colW = firstDims.width + COL_GAP;
-        const rowH = firstDims.height + ROW_GAP;
-        const gridOffsetX = parentPos.x + 40;
-        const gridOffsetY = parentPos.y + 80;
-
-        for (const child of unpositioned) {
-          newPositions.push({
-            entityId: child.id,
-            x: gridOffsetX + col * colW,
-            y: gridOffsetY + row * rowH,
-            locked: false,
-          } as NodePosition);
-          col++;
-          if (col >= COLS) { col = 0; row++; }
-        }
-      }
-
-      set({ expandedEntityIds: next, manualLayout: true, positions: newPositions });
     }
+
+    // Commit the new expanded set and clear manualLayout so the DiagramCanvas
+    // layout effect fires a full autoLayout() — same path as any other composition change.
+    set({ expandedEntityIds: next, manualLayout: false });
   },
 });

@@ -108,6 +108,16 @@
   border-bottom-color: #e74c3c;
 }
 
+.ef-tab-btn--disclosure {
+  color: var(--accent);
+  font-style: italic;
+  border-bottom: none;
+}
+
+.ef-tab-btn--disclosure:hover {
+  color: var(--text);
+}
+
 .ef-tab-panel {
   flex: 1;
   min-height: 0;

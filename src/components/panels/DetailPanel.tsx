@@ -140,10 +140,22 @@ export const DetailPanel: React.FC = () => {
               <span>{entity.metadata.deploymentStage}</span>
             </div>
           )}
+          {entity.metadata.organization && (
+            <div className="meta-item">
+              <label>Organization</label>
+              <span>{entity.metadata.organization}</span>
+            </div>
+          )}
           {entity.metadata.owner && (
             <div className="meta-item">
               <label>Owner</label>
               <span>{entity.metadata.owner}</span>
+            </div>
+          )}
+          {entity.metadata.sme && (
+            <div className="meta-item">
+              <label>SME</label>
+              <span>{entity.metadata.sme}</span>
             </div>
           )}
           {entity.metadata.tps != null && (
@@ -215,7 +227,7 @@ export const DetailPanel: React.FC = () => {
         <div className="detail-actions">
           {drillable && (
             <button className="btn btn-sm btn-primary" onClick={() => drillDown(entity.id)}>
-              <ArrowDownRight size={14} /> Drill Down
+              <ArrowDownRight size={14} /> Expand Internals
             </button>
           )}
           <button className="btn btn-sm" onClick={() => setShowEntityForm(true, entity.id)}>

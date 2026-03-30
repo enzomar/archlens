@@ -1,16 +1,9 @@
 import React from 'react';
 import { useStore } from '../../store/useStore';
-import { KIND_TO_ZOOM, CONCRETE_VIEWPOINTS, VIEWPOINT_LABELS, getViewpointsForKindLevel } from '../../domain/types';
+import { KIND_TO_ZOOM, CONCRETE_VIEWPOINTS, VIEWPOINT_LABELS, ZOOM_LEVEL_LABELS, getViewpointsForKindLevel } from '../../domain/types';
 import type { EntityKind, Viewpoint, ZoomLevel } from '../../domain/types';
 import { getValidKindsForViewpoint } from '../../utils/validation';
-import { Edit, Trash2, Plus, Eye, LayoutGrid, RotateCcw, StickyNote, Square, Navigation } from 'lucide-react';
-
-const ZOOM_TITLES: Record<string, string> = {
-  context: 'System Context',
-  container: 'Container',
-  component: 'Component',
-  code: 'Code',
-};
+import { Edit, Trash2, Plus, Eye, LayoutGrid, RotateCcw, StickyNote, Square, Navigation, GitBranch, Minus } from 'lucide-react';
 
 type ContextMenuTarget =
   | { kind: 'entity'; id: string }
@@ -40,6 +33,8 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ target, x,
   const deleteNote = useStore((s) => s.deleteNote);
   const deleteBoundary = useStore((s) => s.deleteBoundary);
   const deleteRelationship = useStore((s) => s.deleteRelationship);
+  const updateRelationship = useStore((s) => s.updateRelationship);
+  const relationships = useStore((s) => s.relationships);
   const setShowEntityForm = useStore((s) => s.setShowEntityForm);
   const setShowRelationshipForm = useStore((s) => s.setShowRelationshipForm);
   const setShowNoteForm = useStore((s) => s.setShowNoteForm);
@@ -77,7 +72,7 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ target, x,
             viewInOptions.push({
               vp,
               level: kindLevel,
-              label: `${VIEWPOINT_LABELS[vp]} · ${ZOOM_TITLES[kindLevel]}`,
+              label: `${VIEWPOINT_LABELS[vp]} · ${ZOOM_LEVEL_LABELS[kindLevel]}`,
             });
           }
         }
@@ -89,7 +84,7 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ target, x,
         <Edit size={14} /><span>Edit Entity</span>
       </button>,
       <button key="drill" className="ctx-item" onClick={() => { drillDown(t.id); onClose(); }}>
-        <Eye size={14} /><span>Drill Down</span>
+        <Eye size={14} /><span>Expand Internals</span>
       </button>,
     );
     if (viewInOptions.length > 0) {
@@ -136,9 +131,34 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ target, x,
       </button>,
     );
   } else if (t.kind === 'relationship') {
+    const rel = relationships.find((r) => r.id === t.id);
+    const curRouting = rel?.routing;
     items.push(
       <button key="edit" className="ctx-item" onClick={() => { setShowRelationshipForm(true, t.id); onClose(); }}>
         <Edit size={14} /><span>Edit Relationship</span>
+      </button>,
+      <div key="sep-route" className="ctx-separator" />,
+      <div key="route-label" className="ctx-group-label">Routing</div>,
+      <button
+        key="route-ortho"
+        className={`ctx-item${curRouting === 'ORTHOGONAL' ? ' ctx-item--active' : ''}`}
+        onClick={() => { updateRelationship(t.id, { routing: 'ORTHOGONAL' }); onClose(); }}
+      >
+        <GitBranch size={14} /><span>Orthogonal (elbow)</span>
+      </button>,
+      <button
+        key="route-poly"
+        className={`ctx-item${curRouting === 'POLYLINE' ? ' ctx-item--active' : ''}`}
+        onClick={() => { updateRelationship(t.id, { routing: 'POLYLINE' }); onClose(); }}
+      >
+        <Minus size={14} /><span>Polyline (straight)</span>
+      </button>,
+      <button
+        key="route-inherit"
+        className={`ctx-item${!curRouting ? ' ctx-item--active' : ''}`}
+        onClick={() => { updateRelationship(t.id, { routing: undefined }); onClose(); }}
+      >
+        <RotateCcw size={14} /><span>Inherit global</span>
       </button>,
       <div key="sep" className="ctx-separator" />,
       <button key="del" className="ctx-item ctx-item--danger" onClick={() => { deleteRelationship(t.id); onClose(); }}>

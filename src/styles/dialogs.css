@@ -323,6 +323,129 @@
   transform: scale(1.3);
 }
 
+/* ── ABOUT MODAL ── */
+.modal-content--about {
+  max-width: 420px;
+}
+
+.about-content {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.about-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.about-logo-icon {
+  font-size: 42px;
+  line-height: 1;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.about-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.about-product-name {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.about-tagline {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.about-version {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: -8px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.about-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.about-features {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 14px;
+  background: var(--surface-2, var(--surface));
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.about-feature {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.about-feature-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.about-built-with {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.about-built-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.about-tech-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.about-tech-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.about-copyright {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0;
+  text-align: center;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
 /* ── SUPPORT MODAL ── */
 .modal-content--support {
   max-width: 440px;
@@ -909,4 +1032,78 @@
   text-align: center;
   color: var(--text-muted, #B2BEC3);
   font-size: 13px;
+}
+
+/* ── WELCOME OVERLAY ─────────────────────────────────────────── */
+
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.welcome-card {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-lg, 0 20px 60px rgba(0,0,0,0.25));
+  padding: 36px 40px 28px;
+  max-width: 400px;
+  width: 90vw;
+  text-align: center;
+}
+
+.welcome-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.welcome-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.welcome-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+
+.welcome-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+
+.welcome-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.welcome-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.welcome-dot--active {
+  background: var(--accent);
+}
+
+.welcome-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }

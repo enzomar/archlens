@@ -304,6 +304,16 @@ details[open] .detail-uuid-summary::before {
   background: rgba(253, 203, 110, 0.15);
 }
 
+.validation-item--clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.validation-item--clickable:hover {
+  opacity: 0.85;
+  text-decoration: underline;
+}
+
 .validation-icon {
   flex-shrink: 0;
 }

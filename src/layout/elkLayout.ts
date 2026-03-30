@@ -25,6 +25,25 @@ import { ArchiMateLayeredGraphBuilder, LANE_LABEL_W } from './archiGraphBuilder'
 // ─── ELK singleton ────────────────────────────────────────────────
 const elk = new ELK();
 
+// ─── Layout cache ─────────────────────────────────────────────────
+// Prevents redundant ELK calls when React re-renders trigger the
+// layout effect with identical inputs.
+let _cacheKey = '';
+let _cacheResult: LayoutResult | null = null;
+let _cacheInflight: Promise<LayoutResult> | null = null;
+
+function layoutCacheKey(
+  entityIds: string[],
+  relIds: string[],
+  orientation: string,
+  displayMode: string,
+  viewpoints: string[],
+  zoomLevels: string[],
+  edgeRouting: string,
+): string {
+  return `${orientation}|${displayMode}|${edgeRouting}|${viewpoints.join(',')}|${zoomLevels.join(',')}|${entityIds.join(',')}|${relIds.join(',')}`;
+}
+
 // ─── Builder registry ─────────────────────────────────────────────
 const builders: Record<LayoutMode, GraphBuilder> = {
   'c4-nested': new C4NestedGraphBuilder(),
@@ -117,6 +136,9 @@ function routeOrthogonal(
   posMap: Map<string, { x: number; y: number; width: number; height: number }>,
   visibleIds: Set<string>,
   elkRoutedIds: Set<string>,
+  /** When true, always route vertically (exit bottom/top).  Used for
+   *  ArchiMate cross-band edges where bands are stacked TOP→DOWN. */
+  forceVertical = false,
 ): EdgeRoute[] {
   const routes: EdgeRoute[] = [];
   for (const rel of relationships) {
@@ -129,7 +151,7 @@ function routeOrthogonal(
     const srcCY = src.y + src.height / 2;
     const tgtCX = tgt.x + tgt.width / 2;
     const tgtCY = tgt.y + tgt.height / 2;
-    if (Math.abs(tgtCY - srcCY) >= Math.abs(tgtCX - srcCX)) {
+    if (forceVertical || Math.abs(tgtCY - srcCY) >= Math.abs(tgtCX - srcCX)) {
       const sy = srcCY < tgtCY ? src.y + src.height : src.y;
       const ty = srcCY < tgtCY ? tgt.y : tgt.y + tgt.height;
       const midY = (sy + ty) / 2;
@@ -199,6 +221,7 @@ function assembleArchiMateResult(
 
   // Each child of the root is a swimlane band
   const swimlanes: Array<{ viewpoint: Viewpoint; x: number; y: number; width: number; height: number }> = [];
+  const bandMap: Record<string, Viewpoint> = {};
 
   for (let i = 0; i < (elkResult.children?.length ?? 0); i++) {
     const bandNode = elkResult.children![i];
@@ -208,7 +231,18 @@ function assembleArchiMateResult(
     const bw = bandNode.width ?? 0;
     const bh = bandNode.height ?? 0;
 
-    swimlanes.push({ viewpoint: vp, x: bx, y: by, width: bw, height: bh });
+    // Skip placeholder bands that have no entity children (ELK allocates them as empty spacers)
+    const hasEntities = (bandNode.children?.length ?? 0) > 0;
+    if (hasEntities) {
+      swimlanes.push({ viewpoint: vp, x: bx, y: by, width: bw, height: bh });
+    }
+
+    // Record band membership for every entity in this band
+    const recordBand = (node: ElkNode) => {
+      bandMap[node.id] = vp;
+      for (const ch of node.children ?? []) recordBand(ch);
+    };
+    for (const child of bandNode.children ?? []) recordBand(child);
 
     // Extract nodes from this band
     for (const child of bandNode.children ?? []) {
@@ -222,9 +256,18 @@ function assembleArchiMateResult(
   // Extract root-level edge routes (cross-viewpoint)
   extractEdgeRoutes(elkResult, 0, 0, edgeRoutes, seenEdgeIds);
 
-  // Fallback routing for any remaining unrouted edges
-  const fallbackRoutes = routeOrthogonal(relationships, posMap, graph.allIds, seenEdgeIds);
+  // Fallback routing for any remaining unrouted edges.
+  // Force vertical for cross-band edges: ArchiMate bands are stacked TOP→DOWN
+  // so cross-band connections must always exit the bottom and enter the top,
+  // never bend horizontally across an intermediate lane.
+  const fallbackRoutes = routeOrthogonal(relationships, posMap, graph.allIds, seenEdgeIds, true);
   edgeRoutes.push(...fallbackRoutes);
+
+  // ── Normalize all bands to the same width ─────────────────────
+  if (swimlanes.length > 0) {
+    const maxW = Math.max(...swimlanes.map((l) => l.width));
+    for (const lane of swimlanes) lane.width = maxW;
+  }
 
   return {
     positions,
@@ -234,6 +277,7 @@ function assembleArchiMateResult(
     containmentBoxes,
     labelWidth: LANE_LABEL_W,
     orientation: 'archimate-layered',
+    bandMap,
   };
 }
 
@@ -260,6 +304,40 @@ export async function computeElkLayout(
     return { positions: existingPositions.filter((p) => p.locked) };
   }
 
+  // ── Cache check: skip ELK entirely if inputs haven't changed ───
+  const key = layoutCacheKey(
+    entities.map((e) => e.id).sort(),
+    relationships.map((r) => r.id).sort(),
+    orientation,
+    displayMode,
+    [...activeViewpoints].sort(),
+    [...activeZoomLevels].sort(),
+    edgeRouting,
+  );
+  if (key === _cacheKey && _cacheResult) return _cacheResult;
+  // Deduplicate concurrent identical calls (e.g. React double-render)
+  if (key === _cacheKey && _cacheInflight) return _cacheInflight;
+
+  const promise = computeElkLayoutInner(entities, existingPositions, displayMode, relationships, activeViewpoints, activeZoomLevels, orientation, edgeRouting);
+  _cacheKey = key;
+  _cacheInflight = promise;
+  const result = await promise;
+  _cacheResult = result;
+  _cacheInflight = null;
+  return result;
+}
+
+async function computeElkLayoutInner(
+  entities: ArchEntity[],
+  existingPositions: NodePosition[],
+  displayMode: NodeDisplayMode,
+  relationships: Relationship[],
+  activeViewpoints: Viewpoint[],
+  activeZoomLevels: ZoomLevel[],
+  orientation: LayoutMode,
+  edgeRouting: string,
+): Promise<LayoutResult> {
+
   const dims = displayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
   const zc = getZoomConfig(activeZoomLevels);
 
@@ -270,11 +348,17 @@ export async function computeElkLayout(
   }
 
   // 2. Build ELK graph
+  // Build prior-position map for x-stability hints across filter changes,
+  // zoom-level switches, and mode toggles (spatial continuity).
+  const priorXMap = new Map<string, number>();
+  for (const p of existingPositions) priorXMap.set(p.entityId, p.x);
+
   const builder = builders[orientation];
   const elkGraph = builder.build(graph, dims, relationships, zc, {
     activeViewpoints,
     activeZoomLevels,
     edgeRouting,
+    priorXMap: priorXMap.size > 0 ? priorXMap : undefined,
   });
 
   // 3. Run ELK

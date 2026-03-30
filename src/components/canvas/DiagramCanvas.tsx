@@ -1,24 +1,69 @@
 import React, { useRef, useCallback, useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../store/useStore';
 import { EntityNode } from './EntityNode';
-import { RelationshipEdge, EdgeDefs } from './RelationshipEdge';
+import { RelationshipEdge, EdgeDefs, rectEdgePoint } from './RelationshipEdge';
 import { NoteNode } from './NoteNode';
 import { BoundaryBox } from './BoundaryBox';
 import { computeElkLayout } from '../../layout/elkLayout';
-import { KIND_COLORS, NODE_DIMENSIONS, NODE_DIMENSIONS_EXTENDED, VIEWPOINT_LABELS, VIEWPOINT_COLORS, VIEWPOINT_BG_COLORS } from '../../domain/types';
-import type { EntityKind, EdgeType, Viewpoint } from '../../domain/types';
+import { KIND_COLORS, NODE_DIMENSIONS, NODE_DIMENSIONS_EXTENDED, VIEWPOINT_LABELS, VIEWPOINT_COLORS, VIEWPOINT_BG_COLORS, ZOOM_LEVEL_LABELS } from '../../domain/types';
+import type { EntityKind, EdgeType, Viewpoint, HighlightShape } from '../../domain/types';
 import { getValidKindsForViewpoint } from '../../utils/validation';
 import { CanvasContextMenu } from './CanvasContextMenu';
 import type { ContextMenuTarget } from './CanvasContextMenu';
 import { CanvasLegend } from './CanvasLegend';
 import { InspectOverlay } from './InspectOverlay';
 import type { InspectTarget } from './InspectOverlay';
+import { EXAMPLE_PROJECT } from '../../utils/exampleData';
 
-const ZOOM_TITLES: Record<string, string> = {
-  context: 'System Context',
-  container: 'Container',
-  component: 'Component',
-  code: 'Code',
+/** Minimum distance from point (px,py) to line segment (ax,ay)-(bx,by) */
+function ptToSegDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.sqrt((px - ax) ** 2 + (py - ay) ** 2);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.sqrt((px - (ax + t * dx)) ** 2 + (py - (ay + t * dy)) ** 2);
+}
+
+/** Minimum distance from point to a polyline (array of {x,y}) */
+function minDistToPolyline(wx: number, wy: number, pts: { x: number; y: number }[]): number {
+  let min = Infinity;
+  for (let i = 0; i < pts.length - 1; i++) {
+    min = Math.min(min, ptToSegDist(wx, wy, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y));
+  }
+  return min;
+}
+
+/**
+ * SVG paint order for entity kinds.
+ * Lower = rendered first (behind); higher = rendered last (in front).
+ *
+ * Desired stack (back → front):
+ *   ArchiMate layer entities (0)
+ *   → C4 Context – person / system (1)
+ *   → C4 Container – container / AI / infra (2)
+ *   → C4 Component – component / retriever / artifact (3)
+ *
+ * Manual boundaries and swimlane backgrounds live in separate SVG layers
+ * that are already positioned correctly (behind all entity nodes).
+ * NoteNodes live in a layer above all entities.
+ */
+const ENTITY_Z_ORDER: Partial<Record<string, number>> = {
+  // ── ArchiMate / infrastructure entities (deepest) ──────────────
+  'stakeholder': 0, 'goal': 0, 'capability': 0, 'requirement': 0,
+  'business-actor': 0, 'business-role': 0, 'business-process': 0,
+  'business-service': 0, 'business-object': 0, 'business-event': 0,
+  'business-interface': 0, 'contract': 0,
+  'node': 0, 'device': 0, 'system-software': 0, 'technology-service': 0,
+  'communication-network': 0, 'technology-interface': 0,
+  'application-component': 0, 'application-service': 0, 'application-function': 0,
+  'application-interface': 0, 'application-process': 0, 'data-object': 0,
+  // ── C4 Context (person / system) ───────────────────────────────
+  'person': 1, 'system': 1,
+  // ── C4 Container (container-level kinds) ───────────────────────
+  'container': 2, 'aimodel': 2, 'vectorstore': 2,
+  // ── C4 Component (finest-grain — always in front) ──────────────
+  'component': 3, 'retriever': 3, 'evaluation': 3, 'artifact': 3, 'trigger': 3,
 };
 
 type ResizeHandleType = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -33,6 +78,13 @@ export const DiagramCanvas: React.FC = () => {
   const [dragging, setDragging] = useState<{ entityId: string; offsetX: number; offsetY: number } | null>(null);
   const [draggingNote, setDraggingNote] = useState<{ noteId: string; offsetX: number; offsetY: number } | null>(null);
   const [draggingBoundary, setDraggingBoundary] = useState<{ boundaryId: string; offsetX: number; offsetY: number } | null>(null);
+  const [draggingParentGroup, setDraggingParentGroup] = useState<{
+    parentId: string;
+    childIds: string[];
+    startMouseX: number;
+    startMouseY: number;
+    startPositions: Map<string, { x: number; y: number }>;
+  } | null>(null);
   const [resizing, setResizing] = useState<{
     kind: 'boundary' | 'note';
     id: string;
@@ -57,10 +109,39 @@ export const DiagramCanvas: React.FC = () => {
 
   const [rubberBand, setRubberBand] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
 
-  // ── Inspect mode ─────────────────────────────────────────────
-  const inspectMode = useStore((s) => s.inspectMode);
+  // ── Canvas interaction mode ───────────────────────────────────
+  const canvasMode = useStore((s) => s.canvasMode);
+  const setCanvasMode = useStore((s) => s.setCanvasMode);
+  const inspectMode = canvasMode === 'inspect';
+  const laserMode = canvasMode === 'laser';
   const [inspectTarget, setInspectTarget] = useState<InspectTarget | null>(null);
   const [inspectMouse, setInspectMouse] = useState({ x: 0, y: 0 });
+  const [laserPos, setLaserPos] = useState<{ x: number; y: number } | null>(null);
+
+  // ── Alignment guides ─────────────────────────────────────────
+  // Each guide is a canvas-space line shown while dragging.
+  type AlignGuide = { orientation: 'h' | 'v'; value: number; span: [number, number] };
+  const [alignGuides, setAlignGuides] = useState<AlignGuide[]>([]);
+
+  /** Snap threshold in canvas pixels — guides appear within this distance. */
+  const ALIGN_THRESH = 6;
+
+  // Global mousemove for laser: tracks position even when the SVG re-renders
+  // during auto-layout, so the dot never disappears mid-session.
+  useEffect(() => {
+    if (!laserMode) { setLaserPos(null); return; }
+    const onMove = (e: MouseEvent) => setLaserPos({ x: e.clientX, y: e.clientY });
+    document.addEventListener('mousemove', onMove);
+    return () => document.removeEventListener('mousemove', onMove);
+  }, [laserMode]);
+
+  // ── Highlight / spotlight drawing state ──────────────────────
+  const highlightShapes = useStore((s) => s.highlightShapes);
+  const highlightShapeType = useStore((s) => s.highlightShapeType);
+  const addHighlightShape = useStore((s) => s.addHighlightShape);
+  const selectedHighlightId = useStore((s) => s.selectedHighlightId);
+  const selectHighlight = useStore((s) => s.selectHighlight);
+  const [drawingHighlight, setDrawingHighlight] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
 
   const entities = useStore((s) => s.entities);
   const relationships = useStore((s) => s.relationships);
@@ -86,6 +167,7 @@ export const DiagramCanvas: React.FC = () => {
   const autoLayout = useStore((s) => s.autoLayout);
   const manualLayout = useStore((s) => s.manualLayout);
   const setManualLayout = useStore((s) => s.setManualLayout);
+  const swimlaneOrientation = useStore((s) => s.swimlaneOrientation);
   const uiMode = useStore((s) => s.uiMode);
   const isReadOnly = uiMode === 'presentation';
 
@@ -111,16 +193,30 @@ export const DiagramCanvas: React.FC = () => {
   const getVisibleEntities = useStore((s) => s.getVisibleEntities);
   const getVisibleRelationships = useStore((s) => s.getVisibleRelationships);
 
+  // Derive visible sets once per render; stabilise IDs so useEffect deps
+  // don't change on every render when the actual data hasn't changed.
   const visibleEntities = getVisibleEntities();
   const visibleRelationships = getVisibleRelationships();
+  const visibleEntityKey = useMemo(
+    () => visibleEntities.map((e) => e.id).join(','),
+    [visibleEntities],
+  );
+  const visibleRelKey = useMemo(
+    () => visibleRelationships.map((r) => r.id).join(','),
+    [visibleRelationships],
+  );
+
+  // Guard against concurrent / redundant layout runs.
+  const layoutRunning = useRef(false);
 
   // Auto layout on mount or when visible entities/relationships change
   useEffect(() => {
     if (visibleEntities.length === 0) return;
 
     if (!manualLayout) {
-      // Full auto-layout whenever composition changes
-      autoLayout();
+      if (layoutRunning.current) return;
+      layoutRunning.current = true;
+      autoLayout().finally(() => { layoutRunning.current = false; });
       return;
     }
 
@@ -136,7 +232,7 @@ export const DiagramCanvas: React.FC = () => {
         }
       }
       const layoutEntities = visibleEntities.filter((e) => !childParentIds.has(e.id));
-      computeElkLayout(layoutEntities, positions, visualConfig.nodeDisplayMode, visibleRelationships, activeViewpoints, activeZoomLevels, undefined, visualConfig.edgeRouting).then((result) => {
+      computeElkLayout(layoutEntities, positions, visualConfig.nodeDisplayMode, visibleRelationships, activeViewpoints, activeZoomLevels, swimlaneOrientation, visualConfig.edgeRoutingContainment).then((result) => {
         const posMap2 = new Map(positions.map((p) => [p.entityId, p]));
         for (const pos of result.positions) {
           if (!posMap2.has(pos.entityId)) {
@@ -145,7 +241,7 @@ export const DiagramCanvas: React.FC = () => {
         }
       });
     }
-  }, [visibleEntities.map((e) => e.id).join(','), visibleRelationships.map((r) => r.id).join(','), manualLayout, activeViewpoints.join(','), activeZoomLevels.join(',')]);
+  }, [visibleEntityKey, visibleRelKey, manualLayout, activeViewpoints.join(','), activeZoomLevels.join(','), visualConfig.edgeRoutingContainment, visualConfig.edgeRoutingExternal, visualConfig.nodeDisplayMode, swimlaneOrientation]);
 
   // Space key: activates pan-override mode (Space + drag)
   useEffect(() => {
@@ -161,9 +257,32 @@ export const DiagramCanvas: React.FC = () => {
         return;
       }
 
+      // Arrow keys: pan the canvas
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const step = e.shiftKey ? 200 : 60;
+        const s = useStore.getState();
+        const dx = e.key === 'ArrowLeft' ? step : e.key === 'ArrowRight' ? -step : 0;
+        const dy = e.key === 'ArrowUp' ? step : e.key === 'ArrowDown' ? -step : 0;
+        s.setPan(s.panX + dx, s.panY + dy);
+        return;
+      }
+
+      // Canvas mode shortcuts: V = select, H = pan (hand), I = inspect
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.repeat) {
+        if (e.key === 'v' || e.key === 'V') { setCanvasMode('select'); return; }
+        if (e.key === 'h' || e.key === 'H') { setCanvasMode('pan'); return; }
+        if (e.key === 'i' || e.key === 'I') { setCanvasMode('inspect'); return; }
+        if (e.key === 'l' || e.key === 'L') { setCanvasMode('highlight'); return; }
+        if (e.key === 'p' || e.key === 'P') { setCanvasMode('laser'); return; }
+      }
+
       if ((e.key === 'Delete' || e.key === 'Backspace') && !e.repeat) {
         const state = useStore.getState();
-        if (state.selectedEntityIds.size > 0) {
+        if (state.selectedHighlightId) {
+          e.preventDefault();
+          state.removeHighlightShape(state.selectedHighlightId);
+        } else if (state.selectedEntityIds.size > 0) {
           e.preventDefault();
           state.deleteSelectedEntities();
         } else if (state.selectedEntityId) {
@@ -229,6 +348,11 @@ export const DiagramCanvas: React.FC = () => {
 
   const handleDragStart = useCallback((entityId: string, clientX: number, clientY: number) => {
     if (isReadOnly) return;
+    // Pan mode: override entity drag → start panning
+    if (canvasMode === 'pan') {
+      setPanning({ startX: clientX, startY: clientY, startPanX: panX, startPanY: panY });
+      return;
+    }
     const pos = posMap.get(entityId);
     if (!pos) return;
     // If this entity is part of a multi-selection, bulk-drag all selected
@@ -251,6 +375,10 @@ export const DiagramCanvas: React.FC = () => {
 
   const handleNoteDragStart = useCallback((noteId: string, clientX: number, clientY: number) => {
     if (isReadOnly) return;
+    if (canvasMode === 'pan') {
+      setPanning({ startX: clientX, startY: clientY, startPanX: panX, startPanY: panY });
+      return;
+    }
     const note = notes.find((n) => n.id === noteId);
     if (!note) return;
     setDraggingNote({
@@ -260,8 +388,39 @@ export const DiagramCanvas: React.FC = () => {
     });
   }, [notes, scale, panX, panY]);
 
+  // Drag a parent-group frame: moves the parent entity + all its visible children as a unit
+  const handleParentGroupDragStart = useCallback((parentId: string, clientX: number, clientY: number) => {
+    if (isReadOnly) return;
+    if (canvasMode === 'pan') {
+      setPanning({ startX: clientX, startY: clientY, startPanX: panX, startPanY: panY });
+      return;
+    }
+    // Collect all visible entities that are children of this parent, plus the parent itself
+    const childIds = visibleEntities
+      .filter((e) => e.parentId === parentId)
+      .map((e) => e.id);
+    const allIds = [parentId, ...childIds];
+    const startPositions = new Map<string, { x: number; y: number }>();
+    for (const id of allIds) {
+      const pos = posMap.get(id);
+      if (pos) startPositions.set(id, { x: pos.x, y: pos.y });
+    }
+    if (startPositions.size === 0) return;
+    setDraggingParentGroup({
+      parentId,
+      childIds: allIds,
+      startMouseX: clientX / scale - panX / scale,
+      startMouseY: clientY / scale - panY / scale,
+      startPositions,
+    });
+  }, [isReadOnly, visibleEntities, posMap, scale, panX, panY]);
+
   const handleBoundaryDragStart = useCallback((boundaryId: string, clientX: number, clientY: number) => {
     if (isReadOnly) return;
+    if (canvasMode === 'pan') {
+      setPanning({ startX: clientX, startY: clientY, startPanX: panX, startPanY: panY });
+      return;
+    }
     const boundary = boundaries.find((b) => b.id === boundaryId);
     if (!boundary) return;
     setDraggingBoundary({
@@ -397,6 +556,14 @@ export const DiagramCanvas: React.FC = () => {
       setRubberBand({ ...rubberBand, endX: wx, endY: wy });
       return;
     }
+    if (drawingHighlight) {
+      const svgRect = svgRef.current?.getBoundingClientRect();
+      if (!svgRect) return;
+      const wx = (e.clientX - svgRect.left - panX) / scale;
+      const wy = (e.clientY - svgRect.top - panY) / scale;
+      setDrawingHighlight({ ...drawingHighlight, endX: wx, endY: wy });
+      return;
+    }
     if (dragging) {
       const newX = snapVal(e.clientX / scale - dragging.offsetX - panX / scale);
       const newY = snapVal(e.clientY / scale - dragging.offsetY - panY / scale);
@@ -414,6 +581,81 @@ export const DiagramCanvas: React.FC = () => {
         }
       } else {
         setPosition(dragging.entityId, newX, newY);
+      }
+
+      // ── Compute alignment guides (only when feature is enabled) ─────────
+      if (!visualConfig.showAlignGuides) { setAlignGuides([]); }
+      else {
+      const DIMS_MAP_AG = visualConfig.nodeDisplayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
+      const draggedKind = visibleEntities.find((en) => en.id === dragging.entityId)?.kind;
+      const draggedDim = (draggedKind ? DIMS_MAP_AG[draggedKind] : undefined) ?? { width: 160, height: 80 };
+      // Edges of the dragged node
+      const dLeft   = newX;
+      const dCenterX = newX + draggedDim.width / 2;
+      const dRight  = newX + draggedDim.width;
+      const dTop    = newY;
+      const dCenterY = newY + draggedDim.height / 2;
+      const dBottom = newY + draggedDim.height;
+
+      const guides: AlignGuide[] = [];
+      // Span of all nodes for extending guide lines across the canvas
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const ent of visibleEntities) {
+        if (ent.id === dragging.entityId) continue;
+        const p = posMap.get(ent.id); if (!p) continue;
+        const d = DIMS_MAP_AG[ent.kind] ?? { width: 160, height: 80 };
+        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x + d.width);
+        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y + d.height);
+      }
+      const spanX: [number, number] = [Math.min(minX, dLeft) - 20, Math.max(maxX, dRight) + 20];
+      const spanY: [number, number] = [Math.min(minY, dTop)  - 20, Math.max(maxY, dBottom) + 20];
+
+      for (const ent of visibleEntities) {
+        if (ent.id === dragging.entityId) continue;
+        const p = posMap.get(ent.id); if (!p) continue;
+        const d = DIMS_MAP_AG[ent.kind] ?? { width: 160, height: 80 };
+        const oLeft    = p.x;
+        const oCenterX = p.x + d.width / 2;
+        const oRight   = p.x + d.width;
+        const oTop     = p.y;
+        const oCenterY = p.y + d.height / 2;
+        const oBottom  = p.y + d.height;
+        // Vertical guides (check X edges)
+        for (const [dv, ov] of [
+          [dLeft, oLeft], [dLeft, oCenterX], [dLeft, oRight],
+          [dCenterX, oLeft], [dCenterX, oCenterX], [dCenterX, oRight],
+          [dRight, oLeft], [dRight, oCenterX], [dRight, oRight],
+        ] as [number, number][]) {
+          if (Math.abs(dv - ov) <= ALIGN_THRESH) {
+            if (!guides.some((g) => g.orientation === 'v' && Math.abs(g.value - ov) < 1)) {
+              guides.push({ orientation: 'v', value: ov, span: spanY });
+            }
+          }
+        }
+        // Horizontal guides (check Y edges)
+        for (const [dv, ov] of [
+          [dTop, oTop], [dTop, oCenterY], [dTop, oBottom],
+          [dCenterY, oTop], [dCenterY, oCenterY], [dCenterY, oBottom],
+          [dBottom, oTop], [dBottom, oCenterY], [dBottom, oBottom],
+        ] as [number, number][]) {
+          if (Math.abs(dv - ov) <= ALIGN_THRESH) {
+            if (!guides.some((g) => g.orientation === 'h' && Math.abs(g.value - ov) < 1)) {
+              guides.push({ orientation: 'h', value: ov, span: spanX });
+            }
+          }
+        }
+      }
+      setAlignGuides(guides);
+      } // end showAlignGuides
+    } else if (draggingParentGroup) {
+      // Move all children + parent by the mouse delta from drag start
+      const curX = e.clientX / scale - panX / scale;
+      const curY = e.clientY / scale - panY / scale;
+      const dx = curX - draggingParentGroup.startMouseX;
+      const dy = curY - draggingParentGroup.startMouseY;
+      for (const id of draggingParentGroup.childIds) {
+        const orig = draggingParentGroup.startPositions.get(id);
+        if (orig) setPosition(id, snapVal(orig.x + dx), snapVal(orig.y + dy));
       }
     } else if (draggingNote) {
       const newX = snapVal(e.clientX / scale - draggingNote.offsetX - panX / scale);
@@ -448,16 +690,15 @@ export const DiagramCanvas: React.FC = () => {
           }
         }
 
-        // 1b. Check containment boxes (parent entities without node positions)
-        if (!found && containmentBoxes) {
-          // Iterate in reverse so deeper (smaller) boxes are hit first
-          for (let i = containmentBoxes.length - 1; i >= 0; i--) {
-            const box = containmentBoxes[i];
-            if (wx >= box.x && wx <= box.x + box.width && wy >= box.y && wy <= box.y + box.height) {
-              const entity = entityMap.get(box.entityId);
+        // 1b. Check parent group frames (hit deeper/smaller groups first)
+        if (!found && parentGroups.length > 0) {
+          for (let i = parentGroups.length - 1; i >= 0; i--) {
+            const pg = parentGroups[i];
+            if (wx >= pg.x && wx <= pg.x + pg.width && wy >= pg.y && wy <= pg.y + pg.height) {
+              const entity = entityMap.get(pg.id);
               if (entity) {
                 const rels = relationships.filter((r) => r.sourceId === entity.id || r.targetId === entity.id);
-                found = { kind: 'entity', entity, position: { entityId: entity.id, x: box.x, y: box.y, locked: false }, relationships: rels };
+                found = { kind: 'entity', entity, position: { entityId: entity.id, x: pg.x, y: pg.y, locked: false }, relationships: rels };
                 break;
               }
             }
@@ -484,9 +725,9 @@ export const DiagramCanvas: React.FC = () => {
           }
         }
 
-        // 4. Check relationships (proximity to midpoint)
+        // 4. Check relationships (proximity to any segment of the path)
         if (!found) {
-          const HIT_RADIUS = 12;
+          const HIT_RADIUS = 14;
           for (const rel of visibleRelationships) {
             const sPos = posMap.get(rel.sourceId);
             const tPos = posMap.get(rel.targetId);
@@ -495,10 +736,29 @@ export const DiagramCanvas: React.FC = () => {
             if (!sPos || !tPos || !sEnt || !tEnt) continue;
             const sd = DIMS_MAP[sEnt.kind];
             const td = DIMS_MAP[tEnt.kind];
-            const midX = (sPos.x + sd.width / 2 + tPos.x + td.width / 2) / 2;
-            const midY = (sPos.y + sd.height / 2 + tPos.y + td.height / 2) / 2;
-            const dist = Math.sqrt((wx - midX) ** 2 + (wy - midY) ** 2);
-            if (dist <= HIT_RADIUS) {
+            const sCx = sPos.x + sd.width / 2;
+            const sCy = sPos.y + sd.height / 2;
+            const tCx = tPos.x + td.width / 2;
+            const tCy = tPos.y + td.height / 2;
+            const sp = rectEdgePoint(sCx, sCy, sd.width, sd.height, tCx, tCy);
+            const tp = rectEdgePoint(tCx, tCy, td.width, td.height, sCx, sCy);
+            const isContainment = sEnt.parentId === tEnt.parentId;
+            const edgeRouting = isContainment ? visualConfig.edgeRoutingContainment : visualConfig.edgeRoutingExternal;
+            let pathPts: { x: number; y: number }[];
+            if (edgeRouting === 'POLYLINE') {
+              pathPts = [sp, tp];
+            } else {
+              // ORTHOGONAL elbow
+              const domH = Math.abs(tp.x - sp.x) >= Math.abs(tp.y - sp.y);
+              if (domH) {
+                const midX = (sp.x + tp.x) / 2;
+                pathPts = [sp, { x: midX, y: sp.y }, { x: midX, y: tp.y }, tp];
+              } else {
+                const midY = (sp.y + tp.y) / 2;
+                pathPts = [sp, { x: sp.x, y: midY }, { x: tp.x, y: midY }, tp];
+              }
+            }
+            if (minDistToPolyline(wx, wy, pathPts) <= HIT_RADIUS) {
               found = { kind: 'relationship', rel, source: sEnt, target: tEnt };
               break;
             }
@@ -508,9 +768,26 @@ export const DiagramCanvas: React.FC = () => {
         setInspectTarget(found);
       }
     }
-  }, [rubberBand, resizing, connecting, dragging, draggingNote, draggingBoundary, scale, panX, panY, snap, visibleEntities, posMap, visualConfig.nodeDisplayMode, inspectMode, notes, boundaries, visibleRelationships, relationships, entityMap]);
+  }, [rubberBand, drawingHighlight, resizing, connecting, dragging, draggingNote, draggingBoundary, scale, panX, panY, snap, visibleEntities, posMap, visualConfig.nodeDisplayMode, inspectMode, notes, boundaries, visibleRelationships, relationships, entityMap]);
 
   const handleMouseUp = useCallback(() => {
+    // Commit a highlight shape
+    if (drawingHighlight) {
+      const x = Math.min(drawingHighlight.startX, drawingHighlight.endX);
+      const y = Math.min(drawingHighlight.startY, drawingHighlight.endY);
+      const w = Math.abs(drawingHighlight.endX - drawingHighlight.startX);
+      const h = Math.abs(drawingHighlight.endY - drawingHighlight.startY);
+      // Only commit if the shape is reasonably large (avoids accidental clicks)
+      if (w > 10 && h > 10) {
+        addHighlightShape({
+          id: `hl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          type: highlightShapeType,
+          x, y, width: w, height: h,
+        });
+      }
+      setDrawingHighlight(null);
+      return;
+    }
     if (rubberBand) {
       // Compute entities within the rubber-band rectangle
       const x1 = Math.min(rubberBand.startX, rubberBand.endX);
@@ -541,15 +818,17 @@ export const DiagramCanvas: React.FC = () => {
       setConnecting(null);
       return;
     }
-    if (dragging) {
+    if (dragging || draggingParentGroup) {
       setManualLayout(true);
     }
+    setAlignGuides([]);
     setDragging(null);
     setDraggingNote(null);
     setDraggingBoundary(null);
+    setDraggingParentGroup(null);
     setResizing(null);
     setPanning(null);
-  }, [rubberBand, connecting, dragging, openNewRelationship, setManualLayout, visibleEntities, posMap, visualConfig.nodeDisplayMode]);
+  }, [drawingHighlight, highlightShapeType, addHighlightShape, rubberBand, connecting, dragging, draggingParentGroup, openNewRelationship, setManualLayout, visibleEntities, posMap, visualConfig.nodeDisplayMode]);
 
   // Start a drag-to-connect from an entity's border
   const handleConnectStart = useCallback((sourceId: string, clientX: number, clientY: number) => {
@@ -562,6 +841,23 @@ export const DiagramCanvas: React.FC = () => {
   // Background rect: left-click on empty canvas space → deselect all + pan (or rubber-band with Shift)
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
+
+    // Pan mode: always start panning, skip selection
+    if (canvasMode === 'pan') {
+      setPanning({ startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY });
+      return;
+    }
+
+    // Highlight mode: start drawing a spotlight shape
+    if (canvasMode === 'highlight') {
+      const svgRect = svgRef.current?.getBoundingClientRect();
+      if (!svgRect) return;
+      const wx = (e.clientX - svgRect.left - panX) / scale;
+      const wy = (e.clientY - svgRect.top - panY) / scale;
+      setDrawingHighlight({ startX: wx, startY: wy, endX: wx, endY: wy });
+      return;
+    }
+
     if (e.shiftKey && !isReadOnly) {
       // Start rubber-band selection
       const svgRect = svgRef.current?.getBoundingClientRect();
@@ -573,9 +869,10 @@ export const DiagramCanvas: React.FC = () => {
     }
     selectEntity(null);
     selectRelationship(null);
+    selectHighlight(null);
     clearMultiSelect();
     setPanning({ startX: e.clientX, startY: e.clientY, startPanX: panX, startPanY: panY });
-  }, [panX, panY, scale, isReadOnly]);
+  }, [panX, panY, scale, isReadOnly, canvasMode]);
 
   // SVG level: middle-button (button=1) always pans regardless of what's under the cursor
   const handleSvgMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
@@ -630,6 +927,7 @@ export const DiagramCanvas: React.FC = () => {
     setDragging(null);
     setDraggingNote(null);
     setDraggingBoundary(null);
+    setDraggingParentGroup(null);
     setResizing(null);
     setConnecting(null);
 
@@ -692,12 +990,87 @@ export const DiagramCanvas: React.FC = () => {
   const focusEntity = focusEntityId ? entities.find((e) => e.id === focusEntityId) : null;
   const isGlobalView = false;
   const lastLayoutResult = useStore((s) => s.lastLayoutResult);
-  const swimlanes = lastLayoutResult?.swimlanes;
-  const containmentBoxes = lastLayoutResult?.containmentBoxes;
-  const isSwimlaneView = lastLayoutResult?.strategy === 'swimlane' && !!swimlanes;
+  const baseSwimlanes = lastLayoutResult?.swimlanes;
+  const bandMap = lastLayoutResult?.bandMap;
+  const isSwimlaneView = lastLayoutResult?.strategy === 'swimlane' && !!baseSwimlanes;
+
+  // ── Live swimlanes: wrap band rects around actual entity positions ──
+  // Each band's rect is derived from its entities' current positions so that
+  // dragging an entity grows the band.  All bands share the same x / width.
+  // A non-overlap constraint pushes later bands down if an earlier band's
+  // entities extend into the next band's territory.
+  const BAND_PAD = 20; // px padding inside band around entities
+  const BAND_GAP = 16; // px vertical gap between adjacent bands
+  const swimlanes = useMemo(() => {
+    if (!baseSwimlanes || !bandMap) return baseSwimlanes;
+    const DIMS = visualConfig.nodeDisplayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
+
+    // 1. Compute per-band bounding box from entity positions
+    type Bounds = { minX: number; maxX: number; minY: number; maxY: number };
+    const vpBounds = new Map<string, Bounds>();
+    for (const lane of baseSwimlanes) {
+      // Seed from baseSwimlane (ELK output) so empty bands keep their size
+      vpBounds.set(lane.viewpoint, {
+        minX: lane.x, maxX: lane.x + lane.width,
+        minY: lane.y, maxY: lane.y + lane.height,
+      });
+    }
+    for (const p of positions) {
+      const vp = bandMap[p.entityId];
+      if (!vp || !vpBounds.has(vp)) continue;
+      const ent = visibleEntities.find((e) => e.id === p.entityId);
+      const dim = ent ? (DIMS[ent.kind] ?? { width: 160, height: 80 }) : { width: 160, height: 80 };
+      const b = vpBounds.get(vp)!;
+      b.minX = Math.min(b.minX, p.x - BAND_PAD);
+      b.maxX = Math.max(b.maxX, p.x + dim.width + BAND_PAD);
+      b.minY = Math.min(b.minY, p.y - BAND_PAD);
+      b.maxY = Math.max(b.maxY, p.y + dim.height + BAND_PAD);
+    }
+    // Also account for containment boxes
+    for (const box of lastLayoutResult?.containmentBoxes ?? []) {
+      const vp = bandMap[box.entityId];
+      if (!vp || !vpBounds.has(vp)) continue;
+      const b = vpBounds.get(vp)!;
+      b.minX = Math.min(b.minX, box.x - BAND_PAD);
+      b.maxX = Math.max(b.maxX, box.x + box.width + BAND_PAD);
+      b.minY = Math.min(b.minY, box.y - BAND_PAD);
+      b.maxY = Math.max(b.maxY, box.y + box.height + BAND_PAD);
+    }
+
+    // 2. Uniform x and width across all bands
+    let globalMinX = Infinity;
+    let globalMaxX = -Infinity;
+    for (const b of vpBounds.values()) {
+      if (b.minX < globalMinX) globalMinX = b.minX;
+      if (b.maxX > globalMaxX) globalMaxX = b.maxX;
+    }
+    if (globalMinX === Infinity) return baseSwimlanes;
+    const bandW = globalMaxX - globalMinX;
+
+    // 3. Build lanes from entity-derived bounds
+    const lanes = baseSwimlanes.map((lane) => {
+      const b = vpBounds.get(lane.viewpoint)!;
+      return { ...lane, x: globalMinX, y: b.minY, width: bandW, height: b.maxY - b.minY };
+    });
+
+    // 4. Non-overlap safety: push each band below the previous one
+    for (let i = 1; i < lanes.length; i++) {
+      const prevBottom = lanes[i - 1].y + lanes[i - 1].height;
+      if (lanes[i].y < prevBottom + BAND_GAP) {
+        const pushDelta = prevBottom + BAND_GAP - lanes[i].y;
+        lanes[i].y += pushDelta;
+        // Extend height so the band still reaches its entities' bottom
+        const origBottom = vpBounds.get(lanes[i].viewpoint)!.maxY;
+        lanes[i].height = Math.max(lanes[i].height, origBottom - lanes[i].y);
+      }
+    }
+
+    return lanes;
+  }, [baseSwimlanes, bandMap, positions, visibleEntities, visualConfig.nodeDisplayMode, lastLayoutResult?.containmentBoxes]);
+
   const diagramTitle = focusEntityId
-    ? `${VIEWPOINT_LABELS[viewpoint]} · ${ZOOM_TITLES[zoomLevel]} — ${focusEntity?.name ?? projectName}`
-    : `${activeViewpoints.map((vp) => VIEWPOINT_LABELS[vp]).join(' + ')} · ${activeZoomLevels.map((zl) => ZOOM_TITLES[zl] ?? zl).join(' + ')}`;
+    ? `${VIEWPOINT_LABELS[viewpoint]} · ${ZOOM_LEVEL_LABELS[zoomLevel]} — ${focusEntity?.name ?? projectName}`
+    : `${activeViewpoints.map((vp) => VIEWPOINT_LABELS[vp]).join(' + ')} · ${activeZoomLevels.map((zl) => ZOOM_LEVEL_LABELS[zl] ?? zl).join(' + ')}`;
 
   // Global layout swim-lane/row metadata (global view is currently disabled)
   const globalLanes: { viewpoint: Viewpoint; x: number; y: number; width: number; height: number }[] = [];
@@ -754,16 +1127,12 @@ export const DiagramCanvas: React.FC = () => {
     const FRAME_PAD = 40;
     const DIMS_MAP = visualConfig.nodeDisplayMode === 'extended' ? NODE_DIMENSIONS_EXTENDED : NODE_DIMENSIONS;
 
-    // Skip entities already rendered as ELK containment boxes
-    const elkBoxIds = new Set((containmentBoxes ?? []).map((b) => b.entityId));
-
     // Group visible entities by parentId (only when parent is also visible)
     const visibleIds = new Set(visibleEntities.map((e) => e.id));
     const groups = new Map<string, typeof visibleEntities>();
     for (const e of visibleEntities) {
       if (!e.parentId) continue;
       if (!visibleIds.has(e.parentId)) continue; // parent must also be visible
-      if (elkBoxIds.has(e.parentId)) continue;    // already an ELK containment box
       const arr = groups.get(e.parentId);
       if (arr) arr.push(e);
       else groups.set(e.parentId, [e]);
@@ -809,7 +1178,7 @@ export const DiagramCanvas: React.FC = () => {
       });
     }
     return frames;
-  }, [focusEntityId, visibleEntities, posMap, entities, visualConfig.nodeDisplayMode, containmentBoxes]);
+  }, [focusEntityId, visibleEntities, posMap, entities, visualConfig.nodeDisplayMode]);
 
   // ── Cross-boundary relationships ───────────────────────────────
   // Relationships that connect the focused entity to its peers at
@@ -833,14 +1202,14 @@ export const DiagramCanvas: React.FC = () => {
       height="100%"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={() => { handleMouseUp(); }}
       onMouseDown={handleSvgMouseDown}
       onContextMenu={handleContextMenu}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       style={{
         background: 'var(--canvas-bg, #FAFBFC)',
-        cursor: connecting ? 'crosshair' : panning ? 'grabbing' : resizing ? HANDLE_CURSOR[resizing.handle] : spaceDown ? 'grab' : inspectMode ? 'crosshair' : 'default',
+        cursor: connecting ? 'crosshair' : panning ? 'grabbing' : resizing ? HANDLE_CURSOR[resizing.handle] : spaceDown ? 'grab' : canvasMode === 'pan' ? 'grab' : canvasMode === 'highlight' ? 'crosshair' : inspectMode ? 'crosshair' : laserMode ? 'none' : 'default',
       }}
       role="application"
       aria-label="Architecture diagram canvas. Drag to pan, scroll to zoom, middle-click or Space+drag to pan freely."
@@ -933,7 +1302,7 @@ export const DiagramCanvas: React.FC = () => {
                 opacity={0.6}
                 style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
               >
-                {ZOOM_TITLES[row.level]}
+                {ZOOM_LEVEL_LABELS[row.level]}
               </text>
             ))}
             {/* Vertical separator lines between level columns */}
@@ -998,54 +1367,7 @@ export const DiagramCanvas: React.FC = () => {
             })}
           </g>
 
-          {/* Containment boxes (system / container boundaries) */}
-          <g className="layer-containment-boxes">
-            {containmentBoxes?.map((box) => {
-              const borderColor = VIEWPOINT_COLORS[box.viewpoint];
-              const bgColor = VIEWPOINT_BG_COLORS[box.viewpoint];
-              const isSelected = selectedEntityId === box.entityId || selectedEntityIds.has(box.entityId);
-              return (
-                <g
-                  key={`cbox-${box.entityId}`}
-                  style={{ cursor: 'pointer' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (e.shiftKey) {
-                      toggleSelectEntity(box.entityId);
-                    } else {
-                      selectEntity(box.entityId);
-                    }
-                  }}
-                >
-                  <rect
-                    x={box.x}
-                    y={box.y}
-                    width={box.width}
-                    height={box.height}
-                    rx={6}
-                    fill={bgColor} fillOpacity={0.08}
-                    stroke={borderColor}
-                    strokeWidth={isSelected ? 2.5 : (box.depth === 0 ? 2 : 1.5)}
-                    strokeDasharray={box.depth === 0 ? '8 4' : '5 3'}
-                    opacity={isSelected ? 0.85 : 0.5}
-                    style={{ transition: 'x 0.35s ease, y 0.35s ease, width 0.35s ease, height 0.35s ease' }}
-                  />
-                  <text
-                    x={box.x + 8}
-                    y={box.y + 16}
-                    fill={borderColor}
-                    fontSize={10}
-                    fontWeight={600}
-                    fontFamily="var(--font)"
-                    opacity={0.7}
-                    pointerEvents="none"
-                  >
-                    {box.label}
-                  </text>
-                </g>
-              );
-            })}
-          </g>
+          {/* Containment boundaries — handled by dynamic parentGroups below */}
           </>
         )}
 
@@ -1088,11 +1410,30 @@ export const DiagramCanvas: React.FC = () => {
           </g>
         )}
 
-        {/* ── Layer 0b: C4 parent grouping frames ── */}
+        {/* ── Layer 0b: Parent grouping frames (always visible, dynamic) ── */}
         {parentGroups.length > 0 && (
-          <g className="layer-parent-groups" pointerEvents="none">
-            {parentGroups.map((pg) => (
-              <g key={pg.id}>
+          <g className="layer-parent-groups">
+            {parentGroups.map((pg) => {
+              const isSelected = selectedEntityId === pg.id || selectedEntityIds.has(pg.id);
+              return (
+              <g
+                key={pg.id}
+                style={{ cursor: draggingParentGroup?.parentId === pg.id ? 'grabbing' : 'grab' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (e.shiftKey) {
+                    toggleSelectEntity(pg.id);
+                  } else {
+                    selectEntity(pg.id);
+                  }
+                }}
+                onMouseDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.stopPropagation();
+                  selectEntity(pg.id);
+                  handleParentGroupDragStart(pg.id, e.clientX, e.clientY);
+                }}
+              >
                 <rect
                   x={pg.x} y={pg.y}
                   width={pg.width} height={pg.height}
@@ -1100,9 +1441,9 @@ export const DiagramCanvas: React.FC = () => {
                   fill={pg.color}
                   fillOpacity={0.05}
                   stroke={pg.color}
-                  strokeWidth={2}
+                  strokeWidth={isSelected ? 2.5 : 2}
                   strokeDasharray="8 4"
-                  opacity={0.55}
+                  opacity={isSelected ? 0.85 : 0.55}
                 />
                 <text
                   x={pg.x + 14}
@@ -1112,6 +1453,7 @@ export const DiagramCanvas: React.FC = () => {
                   fontWeight={600}
                   opacity={0.75}
                   fontFamily="var(--font)"
+                  pointerEvents="none"
                 >
                   {pg.label}
                 </text>
@@ -1123,11 +1465,13 @@ export const DiagramCanvas: React.FC = () => {
                   opacity={0.4}
                   fontFamily="var(--font)"
                   style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                  pointerEvents="none"
                 >
                   [{pg.kind}]
                 </text>
               </g>
-            ))}
+              );
+            })}
           </g>
         )}
 
@@ -1183,6 +1527,8 @@ export const DiagramCanvas: React.FC = () => {
                   animateEdges={visualConfig.animateEdges}
                   maxTps={maxTps}
                   nodeDisplayMode={visualConfig.nodeDisplayMode}
+                  edgeRoutingContainment={visualConfig.edgeRoutingContainment}
+                  edgeRoutingExternal={visualConfig.edgeRoutingExternal}
                   onSelect={selectRelationship}
                   onEdit={(id) => setShowRelationshipForm(true, id)}
                   siblingIndex={info.index}
@@ -1192,10 +1538,22 @@ export const DiagramCanvas: React.FC = () => {
             });
           })()}
 
+          {/* ── Alignment guides (shown during entity drag) ─── */}
+          {alignGuides.map((g, i) =>
+            g.orientation === 'v'
+              ? <line key={`ag-v-${i}`} className="align-guide" vectorEffect="non-scaling-stroke" x1={g.value} y1={g.span[0]} x2={g.value} y2={g.span[1]} pointerEvents="none" />
+              : <line key={`ag-h-${i}`} className="align-guide" vectorEffect="non-scaling-stroke" x1={g.span[0]} y1={g.value} x2={g.span[1]} y2={g.value} pointerEvents="none" />
+          )}
+
           {/* Nodes — skip entities that are rendered as parent-group frames */}
           {(() => {
             const frameIds = new Set(parentGroups.map((pg) => pg.id));
-            return visibleEntities.map((entity) => {
+            // Sort by z-order so component > container > context > archimate entities.
+            // Stable sort: items with the same z-value keep their original array order.
+            const sorted = [...visibleEntities].sort(
+              (a, b) => (ENTITY_Z_ORDER[a.kind] ?? 0) - (ENTITY_Z_ORDER[b.kind] ?? 0)
+            );
+            return sorted.map((entity) => {
             // If this entity is a parent-group frame, don't render it as a node
             if (frameIds.has(entity.id)) return null;
             const pos = posMap.get(entity.id);
@@ -1219,6 +1577,8 @@ export const DiagramCanvas: React.FC = () => {
                 onDragStart={handleDragStart}
                 onConnectStart={isReadOnly ? undefined : handleConnectStart}
                 connectTarget={!isReadOnly && connecting !== null && connecting.overEntityId === entity.id}
+                hasChildren={entities.some((c) => c.parentId === entity.id)}
+                onExpand={toggleExpandEntity}
               />
             );
           });
@@ -1364,6 +1724,133 @@ export const DiagramCanvas: React.FC = () => {
             />
           ))}
         </g>
+
+        {/* ── Spotlight / highlight overlay ─────────────────────── */}
+        {(highlightShapes.length > 0 || drawingHighlight) && (() => {
+          // Compute a large "world" bounding box that fully covers the visible area
+          const BIG = 100000;
+          // All committed shapes + the in-progress drawing
+          const allShapes: HighlightShape[] = [...highlightShapes];
+          if (drawingHighlight) {
+            allShapes.push({
+              id: '__drawing__',
+              type: highlightShapeType,
+              x: Math.min(drawingHighlight.startX, drawingHighlight.endX),
+              y: Math.min(drawingHighlight.startY, drawingHighlight.endY),
+              width: Math.abs(drawingHighlight.endX - drawingHighlight.startX),
+              height: Math.abs(drawingHighlight.endY - drawingHighlight.startY),
+            });
+          }
+          return (
+            <g className="layer-highlight-overlay">
+              <defs>
+                <mask id="highlight-mask">
+                  {/* White = dark overlay visible everywhere */}
+                  <rect x={-BIG} y={-BIG} width={BIG * 2} height={BIG * 2} fill="white" />
+                  {/* Black cutouts = bright / transparent → spotlight areas */}
+                  {allShapes.map((s) =>
+                    s.type === 'ellipse' ? (
+                      <ellipse
+                        key={s.id}
+                        cx={s.x + s.width / 2}
+                        cy={s.y + s.height / 2}
+                        rx={s.width / 2}
+                        ry={s.height / 2}
+                        fill="black"
+                      />
+                    ) : (
+                      <rect
+                        key={s.id}
+                        x={s.x} y={s.y}
+                        width={s.width} height={s.height}
+                        rx={4}
+                        fill="black"
+                      />
+                    )
+                  )}
+                </mask>
+              </defs>
+
+              {/* Dark overlay with cutouts */}
+              <rect
+                x={-BIG} y={-BIG}
+                width={BIG * 2} height={BIG * 2}
+                fill="black"
+                opacity={0.55}
+                mask="url(#highlight-mask)"
+                pointerEvents="none"
+              />
+
+              {/* Dashed borders on spotlight shapes — click to select, Delete to remove */}
+              {highlightShapes.map((s) => {
+                const isSel = selectedHighlightId === s.id;
+                const strokeColor = isSel ? 'var(--canvas-edge-selected, #D63031)' : 'var(--accent, #0984E3)';
+                const sw = (isSel ? 3 : 2) / scale;
+                return s.type === 'ellipse' ? (
+                  <ellipse
+                    key={`border-${s.id}`}
+                    cx={s.x + s.width / 2}
+                    cy={s.y + s.height / 2}
+                    rx={s.width / 2}
+                    ry={s.height / 2}
+                    fill="none"
+                    stroke={strokeColor}
+                    strokeWidth={sw}
+                    strokeDasharray={`${6 / scale} ${4 / scale}`}
+                    opacity={0.8}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); selectHighlight(isSel ? null : s.id); }}
+                  />
+                ) : (
+                  <rect
+                    key={`border-${s.id}`}
+                    x={s.x} y={s.y}
+                    width={s.width} height={s.height}
+                    rx={4}
+                    fill="none"
+                    stroke={strokeColor}
+                    strokeWidth={sw}
+                    strokeDasharray={`${6 / scale} ${4 / scale}`}
+                    opacity={0.8}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); selectHighlight(isSel ? null : s.id); }}
+                  />
+                );
+              })}
+
+              {/* In-progress drawing preview */}
+              {drawingHighlight && (() => {
+                const dx = Math.min(drawingHighlight.startX, drawingHighlight.endX);
+                const dy = Math.min(drawingHighlight.startY, drawingHighlight.endY);
+                const dw = Math.abs(drawingHighlight.endX - drawingHighlight.startX);
+                const dh = Math.abs(drawingHighlight.endY - drawingHighlight.startY);
+                return highlightShapeType === 'ellipse' ? (
+                  <ellipse
+                    cx={dx + dw / 2} cy={dy + dh / 2}
+                    rx={dw / 2} ry={dh / 2}
+                    fill="none"
+                    stroke="var(--accent, #0984E3)"
+                    strokeWidth={2 / scale}
+                    strokeDasharray={`${6 / scale} ${4 / scale}`}
+                    opacity={0.6}
+                    pointerEvents="none"
+                  />
+                ) : (
+                  <rect
+                    x={dx} y={dy} width={dw} height={dh}
+                    rx={4}
+                    fill="none"
+                    stroke="var(--accent, #0984E3)"
+                    strokeWidth={2 / scale}
+                    strokeDasharray={`${6 / scale} ${4 / scale}`}
+                    opacity={0.6}
+                    pointerEvents="none"
+                  />
+                );
+              })()}
+            </g>
+          );
+        })()}
       </g>
 
       {/* Empty state – contextual prompt */}
@@ -1382,11 +1869,33 @@ export const DiagramCanvas: React.FC = () => {
             <div className="canvas-empty-prompt" style={{ pointerEvents: 'auto' }}>
               <div className="canvas-empty-icon">◇</div>
               <p className="canvas-empty-title">
-                No diagram for {VIEWPOINT_LABELS[viewpoint]} · {ZOOM_TITLES[zoomLevel]}
+                Start building your architecture
               </p>
               <p className="canvas-empty-hint">
-                Drag shapes from the palette or use the context menu to start building.
+                Choose a starting point, or drag shapes from the palette.
               </p>
+              <div className="canvas-empty-actions">
+                <button className="btn btn-sm btn-primary" onClick={() => {
+                  const sysId = addEntity({ name: 'My System', shortName: 'SYS', description: 'Top-level system', kind: 'system', viewpoint: 'application', parentId: null, metadata: { tags: [] }, responsibilities: [] });
+                  const personId = addEntity({ name: 'User', shortName: 'USR', description: 'End user', kind: 'person', viewpoint: 'application', parentId: null, metadata: { tags: [] }, responsibilities: [] });
+                  addEntity({ name: 'Service', shortName: 'SVC', description: 'Application container', kind: 'container', viewpoint: 'application', parentId: sysId, metadata: { tags: [] }, responsibilities: [] });
+                  selectEntity(personId);
+                  autoLayout();
+                }}>
+                  Map a system
+                </button>
+                <button className="btn btn-sm" onClick={() => {
+                  useStore.getState().setShowEntityForm(true);
+                }}>
+                  Add an entity
+                </button>
+                <button className="btn btn-sm" onClick={() => {
+                  const loadProject = useStore.getState().loadProject;
+                  loadProject(EXAMPLE_PROJECT);
+                }}>
+                  Load example
+                </button>
+              </div>
             </div>
           </div>
         </foreignObject>
@@ -1437,6 +1946,16 @@ export const DiagramCanvas: React.FC = () => {
         mouseX={inspectMouse.x}
         mouseY={inspectMouse.y}
       />
+    )}
+
+    {/* Laser pointer dot — rendered via portal so it sits in document.body as a real HTML element */}
+    {laserMode && laserPos && createPortal(
+      <div
+        className="laser-pointer"
+        style={{ left: laserPos.x, top: laserPos.y }}
+        aria-hidden="true"
+      />,
+      document.body,
     )}
     </>
   );

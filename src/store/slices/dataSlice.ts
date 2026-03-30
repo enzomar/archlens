@@ -212,6 +212,14 @@ export const createDataSlice = (set: StoreSet, get: StoreGet, initialTab: Diagra
       entities: migrateEntities(t.entities),
       traceabilityLinks: t.traceabilityLinks ?? [],
       viewpoint: t.viewpoint ?? 'application',
+      // Merge with defaults so new fields introduced in later versions always have a value.
+      // Old projects had a single `edgeRouting` field; migrate to the new dual-routing shape.
+      visualConfig: {
+        ...DEFAULT_VISUAL_CONFIG,
+        ...(t.visualConfig ?? {}),
+        edgeRoutingContainment: (t.visualConfig as any)?.edgeRoutingContainment ?? (t.visualConfig as any)?.edgeRouting ?? DEFAULT_VISUAL_CONFIG.edgeRoutingContainment,
+        edgeRoutingExternal: (t.visualConfig as any)?.edgeRoutingExternal ?? DEFAULT_VISUAL_CONFIG.edgeRoutingExternal,
+      } as DiagramTab['visualConfig'],
     });
 
     let tabs: DiagramTab[];

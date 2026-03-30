@@ -49,13 +49,30 @@ export const FormatTab: React.FC = () => {
           <button
             className="ribbon-btn"
             onClick={() => {
-              const next = visualConfig.edgeRouting === 'ORTHOGONAL' ? 'POLYLINE' : visualConfig.edgeRouting === 'POLYLINE' ? 'SPLINES' : 'ORTHOGONAL';
-              setVisualConfig({ ...visualConfig, edgeRouting: next });
+              const next = visualConfig.edgeRoutingContainment === 'ORTHOGONAL' ? 'POLYLINE' : 'ORTHOGONAL';
+              setVisualConfig({ ...visualConfig, edgeRoutingContainment: next });
             }}
-            title={`Edge routing: ${visualConfig.edgeRouting.toLowerCase()}`}
+            title={`Internal edge routing (containment): ${visualConfig.edgeRoutingContainment.toLowerCase()}`}
           >
             <span className="ribbon-btn-icon"><Route size={20} /></span>
-            <span className="ribbon-btn-label">{visualConfig.edgeRouting === 'ORTHOGONAL' ? 'Orthogonal' : visualConfig.edgeRouting === 'POLYLINE' ? 'Polyline' : 'Splines'}</span>
+            <span className="ribbon-btn-label">
+              {visualConfig.edgeRoutingContainment === 'ORTHOGONAL' ? 'Ortho' : 'Line'}
+              {' (Int)'}
+            </span>
+          </button>
+          <button
+            className="ribbon-btn"
+            onClick={() => {
+              const next = visualConfig.edgeRoutingExternal === 'ORTHOGONAL' ? 'POLYLINE' : 'ORTHOGONAL';
+              setVisualConfig({ ...visualConfig, edgeRoutingExternal: next });
+            }}
+            title={`External edge routing (cross-layer): ${visualConfig.edgeRoutingExternal.toLowerCase()}`}
+          >
+            <span className="ribbon-btn-icon"><Route size={20} /></span>
+            <span className="ribbon-btn-label">
+              {visualConfig.edgeRoutingExternal === 'ORTHOGONAL' ? 'Ortho' : 'Line'}
+              {' (Ext)'}
+            </span>
           </button>
         </div>
         <span className="ribbon-group-label">Effects</span>

@@ -96,7 +96,9 @@ export interface EntityMetadata {
   techConvergency?: TechConvergency;
   tags: PredefinedTag[];
   technology?: string;
-  owner?: string;
+  owner?: string;         // Manager / accountable person name
+  organization?: string;  // Owning squad, department, or BU
+  sme?: string;           // Subject Matter Expert name
   url?: string;
   notes?: string;
   tps?: number;
@@ -117,6 +119,8 @@ export interface Relationship {
   label: string;
   protocol?: string;
   description?: string;
+  /** Per-edge routing override. Inherits from global VisualConfig when absent. */
+  routing?: 'ORTHOGONAL' | 'POLYLINE';
 }
 
 // ─── ENTITY ──────────────────────────────────────────────────────
@@ -130,7 +134,7 @@ export interface ArchEntity {
   parentName?: string;
   kind: EntityKind;
   viewpoint: Viewpoint;
-  zoomLevel?: ZoomLevel;
+  zoomLevel: ZoomLevel;
   parentId: string | null;
   metadata: EntityMetadata;
   responsibilities: string[];
@@ -252,21 +256,41 @@ export interface ArchLensProject {
   traceabilityLinks?: TraceabilityLink[];
 }
 
+// ─── CANVAS MODE ─────────────────────────────────────────────────
+
+/** select: click/drag entities.  pan: drag always pans.  inspect: hover shows metadata overlay.  highlight: draw spotlight shapes. */
+export type CanvasMode = 'select' | 'pan' | 'inspect' | 'highlight' | 'laser';
+
+/** A spotlight cutout shape drawn in highlight mode. */
+export interface HighlightShape {
+  id: string;
+  type: 'rect' | 'ellipse';
+  /** World-coordinate bounding box */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 // ─── VISUAL CONFIG ───────────────────────────────────────────────
 
 export type EdgeAnimationMode = 'off' | 'on' | 'dynamic';
 
 export type NodeDisplayMode = 'standard' | 'extended';
 
-export type EdgeRoutingMode = 'ORTHOGONAL' | 'POLYLINE' | 'SPLINES';
+export type EdgeRoutingMode = 'ORTHOGONAL' | 'POLYLINE';
 
 export interface VisualConfig {
   colorBy: 'kind' | 'maturity' | 'viewpoint';
   animateEdges: EdgeAnimationMode;
   nodeDisplayMode: NodeDisplayMode;
-  edgeRouting: EdgeRoutingMode;
+  /** Routing style for containment/sibling edges (same parent boundary). Default: ORTHOGONAL */
+  edgeRoutingContainment: EdgeRoutingMode;
+  /** Routing style for cross-layer/external edges (different parent or top-level). Default: POLYLINE */
+  edgeRoutingExternal: EdgeRoutingMode;
   showGrid: boolean;
   snapToGrid: boolean;
+  showAlignGuides: boolean;
 }
 
 export type ThemeMode = 'light' | 'dark' | 'system';

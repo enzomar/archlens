@@ -13,6 +13,8 @@ interface EntityNodeProps {
   onDragStart: (id: string, startX: number, startY: number) => void;
   onConnectStart?: (id: string, clientX: number, clientY: number) => void;
   connectTarget?: boolean; // highlight this node as a connection drop target
+  hasChildren?: boolean;   // whether this node has child entities
+  onExpand?: (id: string) => void; // expand/collapse children inline
 }
 
 const SHAPE_RENDERERS: Record<EntityKind, (w: number, h: number) => React.ReactNode> = {
@@ -400,103 +402,146 @@ const ExtendedNode: React.FC<{ entity: ArchEntity; dims: { width: number; height
   const h = dims.height;
   const meta = entity.metadata;
 
-  // Parse technology string into chips
-  const techChips = meta.technology
-    ? meta.technology.split(/[,;/]+/).map((t) => t.trim()).filter(Boolean)
-    : [];
+  const kindStr = KIND_LABEL[entity.kind];
+  const tech = meta.technology;
+  const showTechInType = tech && !['person', 'trigger', 'business-actor', 'business-role',
+    'business-event', 'business-object', 'contract', 'stakeholder', 'goal',
+    'capability', 'requirement'].includes(entity.kind);
+  const typeLabel = showTechInType
+    ? `[${kindStr}: ${tech!.split(/[,;/]+/)[0].trim()}]`
+    : `[${kindStr}]`;
+  const techChips = tech ? tech.split(/[,;/]+/).map((t) => t.trim()).filter(Boolean) : [];
+  const idBadge = entity.identificationId || entity.shortName || entity.kind.slice(0, 3).toUpperCase();
 
   return (
     <>
-      {/* Card background */}
+      {/* Card frame */}
       <rect x={0} y={0} width={w} height={h} rx={8} ry={8}
-        fill="var(--canvas-bg, #FFFFFF)" stroke={color} strokeWidth={2} />
+        fill="var(--surface, #FFFFFF)" stroke={color} strokeWidth={2} />
 
-      {/* Full card content via foreignObject for CSS Grid */}
       <foreignObject x={0} y={0} width={w} height={h} style={{ overflow: 'hidden', borderRadius: 8 }}>
-        <div className="ext-card" style={{ width: w, height: h, borderColor: color }}>
+        <div className="crc-card" style={{ width: w, height: h }}>
 
-          {/* ── ZONE 1: HEADER ── */}
-          <div className="ext-header" style={{ background: `${color}18` }}>
-            <div className="ext-header-row">
-              {/* Left: 3-letter code badge */}
-              {entity.identificationId ? (
-                <span className="ext-code-badge" style={{ background: `${color}22`, color }}>{entity.identificationId}</span>
-              ) : entity.shortName ? (
-                <span className="ext-code-badge" style={{ background: `${color}22`, color }}>{entity.shortName}</span>
-              ) : (
-                <span className="ext-code-badge" style={{ background: `${color}22`, color }}>{entity.kind.slice(0, 3).toUpperCase()}</span>
-              )}
-
-              {/* Center: long name */}
-              <span className="ext-name" title={entity.name}>{entity.name}</span>
-
-              {/* Right: context badges */}
-              <span className="ext-context-badges">
-                {meta.pii && <span className="ext-badge ext-badge--pii">PII</span>}
-                {meta.pciDss && <span className="ext-badge ext-badge--pci">PCI</span>}
+          {/* ── HEADER ─────────────────────────────────────────── */}
+          <div className="crc-header" style={{ background: `${color}1A`, borderBottom: `1.5px solid ${color}35` }}>
+            <div className="crc-header-top">
+              <span className="crc-id" style={{ background: `${color}28`, color }}>{idBadge}</span>
+              <span className="crc-name">{entity.name}</span>
+              <span className="crc-flags">
+                {meta.pii   && <span className="crc-flag crc-flag--pii">PII</span>}
+                {meta.pciDss && <span className="crc-flag crc-flag--pci">PCI</span>}
               </span>
             </div>
-
-            {/* Kind badge (top-right overlay) */}
-            <span className="ext-kind-badge" style={{ background: color }}>{entity.kind.toUpperCase()}</span>
+            <div className="crc-header-sub">
+              <span className="crc-type">{typeLabel}</span>
+              {meta.maturity && (
+                <span className="crc-pill" style={{ color: MATURITY_LABEL_COLORS[meta.maturity], borderColor: `${MATURITY_LABEL_COLORS[meta.maturity]}40` }}>
+                  {meta.maturity}
+                </span>
+              )}
+              {meta.deploymentStage && (
+                <span className="crc-pill crc-pill--stage">{meta.deploymentStage}</span>
+              )}
+            </div>
+            {/* Kind tab — top-right corner ribbon */}
+            <span className="crc-kind-tab" style={{ background: color }}>
+              {entity.kind.replace(/-/g, ' ')}
+            </span>
           </div>
 
-          {/* ── ZONE 2: DESCRIPTION ── */}
-          {entity.description && (
-            <div className="ext-desc">{entity.description}</div>
-          )}
+          {/* ── DESCRIPTION ────────────────────────────────────── */}
+          <div className="crc-section">
+            <div className="crc-section-hd">Description</div>
+            <div className="crc-desc">
+              {entity.description || <span className="crc-nil">—</span>}
+            </div>
+          </div>
 
-          {/* ── ZONE 3: CLASSIFICATION STRIP ── */}
-          <div className="ext-strip">
-            {meta.appType && <span className="ext-chip">{meta.appType}</span>}
-            {meta.size && <span className="ext-chip">{meta.size}</span>}
-            {meta.compute && <span className="ext-chip">⚙{meta.compute}</span>}
-            {meta.deploymentStage && (
-              <span className="ext-chip ext-chip--stage">{meta.deploymentStage}</span>
+          {/* ── RESPONSIBILITIES (R in CRC) ─────────────────────── */}
+          <div className="crc-section crc-section--grow">
+            <div className="crc-section-hd">Responsibilities</div>
+            {entity.responsibilities.length > 0 ? (
+              <ul className="crc-resp-list">
+                {entity.responsibilities.slice(0, 4).map((r, i) => <li key={i}>{r}</li>)}
+                {entity.responsibilities.length > 4 && (
+                  <li className="crc-more">+{entity.responsibilities.length - 4} more</li>
+                )}
+              </ul>
+            ) : (
+              <span className="crc-nil">—</span>
             )}
-            {meta.maturity && (
-              <span className="ext-chip" style={{ color: MATURITY_LABEL_COLORS[meta.maturity] ?? '#888', borderColor: MATURITY_LABEL_COLORS[meta.maturity] ?? '#888' }}>
-                {meta.maturity}
+          </div>
+
+          {/* ── ATTRIBUTES GRID (3 × 2) ────────────────────────── */}
+          <div className="crc-attrs">
+            <div className="crc-attr">
+              <span className="crc-attr-k">Size</span>
+              <span className="crc-attr-v">{meta.size || '—'}</span>
+            </div>
+            <div className="crc-attr">
+              <span className="crc-attr-k">Compute</span>
+              <span className="crc-attr-v">{meta.compute || '—'}</span>
+            </div>
+            <div className="crc-attr">
+              <span className="crc-attr-k">App Type</span>
+              <span className="crc-attr-v">{meta.appType || '—'}</span>
+            </div>
+            <div className="crc-attr">
+              <span className="crc-attr-k">TPS</span>
+              <span className="crc-attr-v">{meta.tps != null ? meta.tps.toLocaleString() : '—'}</span>
+            </div>
+            <div className="crc-attr">
+              <span className="crc-attr-k">TC</span>
+              <span className="crc-attr-v crc-attr-v--stars">
+                {meta.techConvergency != null
+                  ? '★'.repeat(meta.techConvergency) + '☆'.repeat(3 - meta.techConvergency)
+                  : '—'}
               </span>
-            )}
-          </div>
-
-          {/* ── ZONE 4: CONTENT AREA ── */}
-          <div className="ext-content">
-            {/* LEFT: Metrics */}
-            <div className="ext-metrics">
-              {meta.techConvergency != null && (
-                <span className="ext-metric">
-                  <span className="ext-metric-label">TC</span>
-                  <span className="ext-metric-value">{'★'.repeat(meta.techConvergency)}{'☆'.repeat(3 - meta.techConvergency)}</span>
-                </span>
-              )}
-              {meta.tps != null && (
-                <span className="ext-metric">
-                  <span className="ext-metric-label">TPS</span>
-                  <span className="ext-metric-value">{meta.tps.toLocaleString()}</span>
-                </span>
-              )}
-              {meta.owner && (
-                <span className="ext-metric">
-                  <span className="ext-metric-label">Owner</span>
-                  <span className="ext-metric-value">{meta.owner}</span>
-                </span>
-              )}
             </div>
-
-            {/* RIGHT: Technology chips */}
-            <div className="ext-tech">
-              {techChips.map((t) => (
-                <span key={t} className="ext-tech-chip">{t}</span>
-              ))}
+            <div className="crc-attr">
+              <span className="crc-attr-k">Level</span>
+              <span className="crc-attr-v">{entity.zoomLevel || '—'}</span>
             </div>
           </div>
 
-          {/* Drill-down indicator */}
-          {drillable && (
-            <div className="ext-drill" style={{ color }}>⌄</div>
+          {/* ── OWNERSHIP ──────────────────────────────────────── */}
+          <div className="crc-ownership">
+            <span className="crc-own">
+              <span className="crc-own-k">Owner</span>
+              <span className="crc-own-v">{meta.owner || '—'}</span>
+            </span>
+            <span className="crc-own">
+              <span className="crc-own-k">Org</span>
+              <span className="crc-own-v">{meta.organization || '—'}</span>
+            </span>
+            <span className="crc-own">
+              <span className="crc-own-k">SME</span>
+              <span className="crc-own-v">{meta.sme || '—'}</span>
+            </span>
+          </div>
+
+          {/* ── TECH + TAGS ────────────────────────────────────── */}
+          <div className="crc-chips">
+            {techChips.length > 0
+              ? techChips.map((t) => <span key={t} className="crc-chip crc-chip--tech">{t}</span>)
+              : <span className="crc-nil-chip">Tech —</span>
+            }
+            {meta.tags.map((tag) => (
+              <span key={tag} className="crc-chip crc-chip--tag">{tag}</span>
+            ))}
+          </div>
+
+          {/* ── LINKS FOOTER ───────────────────────────────────── */}
+          {(meta.codeRepository || meta.url || meta.adrUrl || meta.notes) && (
+            <div className="crc-links">
+              {meta.codeRepository && <span className="crc-link" title={meta.codeRepository}>⌥ Repo</span>}
+              {meta.url          && <span className="crc-link" title={meta.url}>🔗 URL</span>}
+              {meta.adrUrl       && <span className="crc-link" title={meta.adrUrl}>📋 ADR</span>}
+              {meta.notes        && <span className="crc-link" title={meta.notes}>📝 Notes</span>}
+            </div>
           )}
+
+          {drillable && <div className="crc-drill" style={{ color }}>⌄</div>}
         </div>
       </foreignObject>
     </>
@@ -507,7 +552,7 @@ const ExtendedNode: React.FC<{ entity: ArchEntity; dims: { width: number; height
 
 export const EntityNode: React.FC<EntityNodeProps> = ({
   entity, x, y, selected, visualConfig, onSelect, onDrillDown, onDragStart,
-  onConnectStart, connectTarget,
+  onConnectStart, connectTarget, hasChildren, onExpand,
 }) => {
   const [borderHover, setBorderHover] = useState(false);
   const isExtended = visualConfig.nodeDisplayMode === 'extended';
@@ -613,6 +658,21 @@ export const EntityNode: React.FC<EntityNodeProps> = ({
             onConnectStart(entity.id, e.clientX, e.clientY);
           }}
         />
+      )}
+
+      {/* ── Expand affordance — rendered last so it sits above the border strike zone */}
+      {drillable && hasChildren && onExpand && (
+        <g
+          className="expand-affordance"
+          transform={`translate(${dims.width - 18}, ${dims.height - 18})`}
+          onClick={(e) => { e.stopPropagation(); onExpand(entity.id); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseEnter={() => setBorderHover(false)}
+          style={{ cursor: 'pointer' }}
+        >
+          <circle cx={8} cy={8} r={10} fill="var(--surface, #fff)" stroke={color} strokeWidth={1.2} opacity={0.9} />
+          <text x={8} y={12} textAnchor="middle" fontSize={12} fill={color} fontWeight={700} style={{ userSelect: 'none' }}>▾</text>
+        </g>
       )}
     </g>
   );

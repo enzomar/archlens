@@ -1,10 +1,19 @@
 import React, { useRef } from 'react';
 import { useStore } from '../../store/useStore';
-import { exportProject, importProject } from '../../export/exportService';
+import { exportProject, exportProjectAs, importProject } from '../../export/exportService';
 import { EXAMPLE_PROJECT } from '../../utils/exampleData';
-import { FilePlus, FolderOpen, Save, Upload, FlaskConical } from 'lucide-react';
+import { FilePlus, FolderOpen, Save, SaveAll, Upload, FlaskConical } from 'lucide-react';
 
-export const FileTab: React.FC = () => {
+/* ── File Menu ─────────────────────────────────────────────────
+   Drop-down menu triggered from the title-bar "File" button.
+   Inspired by PowerPoint backstage / draw.io File menu.
+   ────────────────────────────────────────────────────────────── */
+
+interface FileMenuProps {
+  onClose: () => void;
+}
+
+export const FileMenu: React.FC<FileMenuProps> = ({ onClose }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadProject = useStore((s) => s.loadProject);
   const getProject = useStore((s) => s.getProject);
@@ -21,44 +30,43 @@ export const FileTab: React.FC = () => {
       alert('Failed to load file: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
     e.target.value = '';
+    onClose();
   }
 
   return (
-    <>
-      <div className="ribbon-group">
-        <div className="ribbon-group-buttons">
-          <button className="ribbon-btn" onClick={() => newProject()} title="New project" aria-label="New project">
-            <span className="ribbon-btn-icon"><FilePlus size={20} /></span>
-            <span className="ribbon-btn-label">New</span>
-          </button>
-          <button className="ribbon-btn" onClick={() => fileInputRef.current?.click()} title="Open project file (.archlens / .json)" aria-label="Open project">
-            <span className="ribbon-btn-icon"><FolderOpen size={20} /></span>
-            <span className="ribbon-btn-label">Open</span>
-          </button>
-          <button className="ribbon-btn" onClick={() => exportProject(getProject())} title="Save project (Ctrl+S)" aria-label="Save project">
-            <span className="ribbon-btn-icon"><Save size={20} /></span>
-            <span className="ribbon-btn-label">Save</span>
-          </button>
-        </div>
-        <span className="ribbon-group-label">Project</span>
-      </div>
-
-      <div className="ribbon-separator" />
-
-      <div className="ribbon-group">
-        <div className="ribbon-group-buttons">
-          <button className="ribbon-btn" onClick={() => setShowExportPanel(true)} title="Export project (CSV, Excel, PlantUML…)" aria-label="Export project">
-            <span className="ribbon-btn-icon"><Upload size={20} /></span>
-            <span className="ribbon-btn-label">Export</span>
-          </button>
-          <button className="ribbon-btn" onClick={() => loadProject(EXAMPLE_PROJECT)} title="Load example C4 diagram" aria-label="Load demo project">
-            <span className="ribbon-btn-icon"><FlaskConical size={20} /></span>
-            <span className="ribbon-btn-label">Demo</span>
-          </button>
-        </div>
-        <span className="ribbon-group-label">Share</span>
-      </div>
-
+    <div className="file-menu" role="menu" aria-label="File menu">
+      <button className="file-menu-item" role="menuitem" onClick={() => { newProject(); onClose(); }}>
+        <FilePlus size={15} />
+        <span>New Project</span>
+      </button>
+      <button className="file-menu-item" role="menuitem" onClick={() => fileInputRef.current?.click()}>
+        <FolderOpen size={15} />
+        <span>Open…</span>
+      </button>
+      <button className="file-menu-item" role="menuitem" onClick={() => { exportProject(getProject()); onClose(); }}>
+        <Save size={15} />
+        <span>Save</span>
+        <kbd className="file-menu-shortcut">⌘S</kbd>
+      </button>
+      <button className="file-menu-item" role="menuitem" onClick={() => {
+        const name = prompt('Save as:', getProject().name);
+        if (name) { exportProjectAs(getProject(), name); }
+        onClose();
+      }}>
+        <SaveAll size={15} />
+        <span>Save As…</span>
+        <kbd className="file-menu-shortcut">⇧⌘S</kbd>
+      </button>
+      <div className="file-menu-sep" />
+      <button className="file-menu-item" role="menuitem" onClick={() => { setShowExportPanel(true); onClose(); }}>
+        <Upload size={15} />
+        <span>Export…</span>
+      </button>
+      <div className="file-menu-sep" />
+      <button className="file-menu-item" role="menuitem" onClick={() => { loadProject(EXAMPLE_PROJECT); onClose(); }}>
+        <FlaskConical size={15} />
+        <span>Load Demo</span>
+      </button>
       <input
         ref={fileInputRef}
         type="file"
@@ -66,6 +74,6 @@ export const FileTab: React.FC = () => {
         style={{ display: 'none' }}
         onChange={handleFileImport}
       />
-    </>
+    </div>
   );
 };

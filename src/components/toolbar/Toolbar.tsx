@@ -1,21 +1,21 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useStore, useTemporalStore } from '../../store/useStore';
 import type { ThemeMode } from '../../domain/types';
 import { exportProject } from '../../export/exportService';
-import { FileTab } from './FileTab';
+import { FileMenu } from './FileTab';
 import { InsertTab } from './InsertTab';
 import { ViewTab } from './ViewTab';
 import { FormatTab } from './FormatTab';
 import { HelpTab } from './HelpTab';
-import { SettingsTab } from './SettingsTab';
 import { ToolbarDialogs } from './ToolbarDialogs';
 import {
   Save, Sun, Moon, Monitor,
-  Focus, MonitorPlay, Heart, HelpCircle, Mail,
-  Undo2, Redo2,
+  Focus, MonitorPlay, HelpCircle, Heart,
+  Undo2, Redo2, ChevronDown, Settings,
+  ZoomIn,
 } from 'lucide-react';
 
-type RibbonTab = 'file' | 'insert' | 'view' | 'format' | 'settings' | 'help';
+type RibbonTab = 'home' | 'insert' | 'view' | 'help';
 
 const THEME_ICONS: Record<ThemeMode, React.ReactNode> = {
   light: <Sun size={16} />,
@@ -25,15 +25,71 @@ const THEME_ICONS: Record<ThemeMode, React.ReactNode> = {
 
 const THEME_CYCLE: ThemeMode[] = ['system', 'light', 'dark'];
 
+/* ── Settings dropdown (self-contained store subscriptions) ──── */
+const SettingsDropdown: React.FC = () => {
+  const autosaveEnabled    = useStore((s) => s.autosaveEnabled);
+  const autosaveInterval   = useStore((s) => s.autosaveInterval);
+  const setAutosaveEnabled = useStore((s) => s.setAutosaveEnabled);
+  const setAutosaveInterval = useStore((s) => s.setAutosaveInterval);
+  const zoomSensitivity    = useStore((s) => s.zoomSensitivity);
+  const setZoomSensitivity = useStore((s) => s.setZoomSensitivity);
+
+  return (
+    <div className="settings-dropdown" role="menu" aria-label="Settings">
+      <div className="settings-section">
+        <span className="settings-section-label">Autosave</span>
+        <div className="settings-row">
+          <button
+            className={`settings-toggle${autosaveEnabled ? ' settings-toggle--on' : ''}`}
+            onClick={() => setAutosaveEnabled(!autosaveEnabled)}
+            aria-pressed={autosaveEnabled}
+          >
+            {autosaveEnabled ? 'On' : 'Off'}
+          </button>
+          <input
+            type="number"
+            className="settings-num"
+            value={autosaveInterval}
+            min={5} max={300} step={5}
+            disabled={!autosaveEnabled}
+            onChange={(e) => setAutosaveInterval(Number(e.target.value))}
+            aria-label="Autosave interval in seconds"
+          />
+          <span className="settings-unit">sec</span>
+        </div>
+      </div>
+      <div className="settings-section">
+        <span className="settings-section-label">Zoom Sensitivity</span>
+        <div className="settings-row">
+          <ZoomIn size={12} className="settings-icon" />
+          <input
+            type="range" className="settings-slider"
+            min={1} max={30} step={1}
+            value={Math.round(zoomSensitivity * 100)}
+            onChange={(e) => setZoomSensitivity(Number(e.target.value) / 100)}
+            aria-label="Zoom sensitivity"
+          />
+          <span className="settings-unit">{Math.round(zoomSensitivity * 100)}%</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const Toolbar: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<RibbonTab>('insert');
+  const [activeTab, setActiveTab] = useState<RibbonTab>('home');
   const [ribbonCollapsed, setRibbonCollapsed] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const fileMenuRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   const projectName = useStore((s) => s.projectName);
   const setProjectName = useStore((s) => s.setProjectName);
@@ -63,6 +119,21 @@ export const Toolbar: React.FC = () => {
     setTheme(THEME_CYCLE[(idx + 1) % THEME_CYCLE.length]);
   }
 
+  // Close dropdowns on outside click
+  const closeDropdowns = useCallback((e: MouseEvent) => {
+    if (fileMenuOpen && fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
+      setFileMenuOpen(false);
+    }
+    if (settingsOpen && settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+      setSettingsOpen(false);
+    }
+  }, [fileMenuOpen, settingsOpen]);
+
+  useEffect(() => {
+    document.addEventListener('mousedown', closeDropdowns);
+    return () => document.removeEventListener('mousedown', closeDropdowns);
+  }, [closeDropdowns]);
+
   return (
     <header className="ribbon">
       {/* ── ROW 1: Tab bar ──────────────────────────────────── */}
@@ -71,6 +142,19 @@ export const Toolbar: React.FC = () => {
           <div className="toolbar-logo">
             <span className="logo-icon">◈</span>
             <span className="logo-text">ArchLens</span>
+          </div>
+
+          {/* ── File dropdown trigger ──────────────── */}
+          <div className="ribbon-file-wrapper" ref={fileMenuRef}>
+            <button
+              className={`ribbon-tab ribbon-tab--file${fileMenuOpen ? ' ribbon-tab--active' : ''}`}
+              onClick={() => { setFileMenuOpen((o) => !o); setSettingsOpen(false); }}
+              aria-haspopup="menu"
+              aria-expanded={fileMenuOpen}
+            >
+              File <ChevronDown size={9} style={{ marginLeft: 2, opacity: 0.6 }} />
+            </button>
+            {fileMenuOpen && <FileMenu onClose={() => setFileMenuOpen(false)} />}
           </div>
 
           <div className="ribbon-qab" role="toolbar" aria-label="Quick access">
@@ -103,7 +187,7 @@ export const Toolbar: React.FC = () => {
           </div>
 
           <nav className="ribbon-tabs" role="tablist" aria-label="Ribbon tabs">
-            {(['file', 'insert', 'view', 'format', 'settings', 'help'] as RibbonTab[]).map((tab) => (
+            {(['home', 'insert', 'view', 'help'] as RibbonTab[]).map((tab) => (
               <button
                 key={tab}
                 className={`ribbon-tab ${activeTab === tab && !ribbonCollapsed ? 'ribbon-tab--active' : ''}`}
@@ -176,31 +260,42 @@ export const Toolbar: React.FC = () => {
             {THEME_ICONS[theme]}
           </button>
           <div className="toolbar-divider" />
-          <button className="btn-icon" onClick={() => setShowHelp(true)} aria-label="Help" title="Help">
-            <HelpCircle size={15} />
-          </button>
-          <button className="btn-icon btn-icon--heart" onClick={() => setShowSupport(true)} aria-label="Support ArchLens" title="Support ArchLens">
+          <div className="ribbon-settings-wrapper" ref={settingsRef}>
+            <button
+              className={`btn-icon${settingsOpen ? ' btn-icon--active' : ''}`}
+              onClick={() => { setSettingsOpen((o) => !o); setFileMenuOpen(false); }}
+              aria-label="Settings"
+              title="Settings"
+              aria-haspopup="menu"
+              aria-expanded={settingsOpen}
+            >
+              <Settings size={15} />
+            </button>
+            {settingsOpen && <SettingsDropdown />}
+          </div>
+          <div className="toolbar-divider" />
+          <button className="btn-icon btn-icon--heart" onClick={() => setShowSupport(true)} aria-label="Support" title="Support">
             <Heart size={15} />
           </button>
-          <button className="btn-icon" onClick={() => setShowContact(true)} aria-label="Contact" title="Contact">
-            <Mail size={15} />
+          <button className="btn-icon" onClick={() => setShowHelp(true)} aria-label="Help" title="Help">
+            <HelpCircle size={15} />
           </button>
         </div>
       </div>
 
       {/* ── ROW 2: Ribbon content ──────────────────────────── */}
       <div className={`ribbon-body${ribbonCollapsed ? ' ribbon-body--collapsed' : ''}`} role="tabpanel" id={`ribbon-panel-${activeTab}`} aria-label={`${activeTab} ribbon`}>
-        {activeTab === 'file' && <FileTab />}
+        {activeTab === 'home' && <FormatTab />}
         {activeTab === 'insert' && <InsertTab />}
         {activeTab === 'view' && <ViewTab />}
-        {activeTab === 'format' && <FormatTab />}
-        {activeTab === 'settings' && <SettingsTab />}
-        {activeTab === 'help' && <HelpTab onShowHelp={() => setShowHelp(true)} />}
+        {activeTab === 'help' && <HelpTab onShowHelp={() => setShowHelp(true)} onShowAbout={() => setShowAbout(true)} onShowSupport={() => setShowSupport(true)} onShowContact={() => setShowContact(true)} />}
       </div>
 
       <ToolbarDialogs
         showHelp={showHelp}
         onCloseHelp={() => setShowHelp(false)}
+        showAbout={showAbout}
+        onCloseAbout={() => setShowAbout(false)}
         showSupport={showSupport}
         onCloseSupport={() => setShowSupport(false)}
         showContact={showContact}

@@ -50,12 +50,12 @@ export const CommandPalette: React.FC<{ onClose: () => void }> = ({ onClose }) =
       { id: 'theme-dark', label: 'Theme: Dark', category: 'action', keywords: 'light mode', icon: <Moon size={14} />, action: () => { setTheme('dark'); onClose(); } },
 
       // Navigation
-      { id: 'zoom-context',   label: 'Zoom: System Context', category: 'navigation', keywords: '1 zoom level', action: () => { useStore.getState().toggleActiveZoomLevel('context');   onClose(); } },
-      { id: 'zoom-container', label: 'Zoom: Container',      category: 'navigation', keywords: '2 zoom level', action: () => { useStore.getState().toggleActiveZoomLevel('container'); onClose(); } },
-      { id: 'zoom-component', label: 'Zoom: Component',      category: 'navigation', keywords: '3 zoom level', action: () => { useStore.getState().toggleActiveZoomLevel('component'); onClose(); } },
-      { id: 'vp-business',    label: 'Viewpoint: Business',    category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('business');    onClose(); } },
-      { id: 'vp-application', label: 'Viewpoint: Application', category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('application'); onClose(); } },
-      { id: 'vp-technology',  label: 'Viewpoint: Technology',  category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('technology');  onClose(); } },
+      { id: 'zoom-context',   label: 'Abstraction: System Context', category: 'navigation', keywords: '1 abstraction level', action: () => { useStore.getState().toggleActiveZoomLevel('context');   onClose(); } },
+      { id: 'zoom-container', label: 'Abstraction: Container',      category: 'navigation', keywords: '2 abstraction level', action: () => { useStore.getState().toggleActiveZoomLevel('container'); onClose(); } },
+      { id: 'zoom-component', label: 'Abstraction: Component',      category: 'navigation', keywords: '3 abstraction level', action: () => { useStore.getState().toggleActiveZoomLevel('component'); onClose(); } },
+      { id: 'vp-business',    label: 'Layer: Business',    category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('business');    onClose(); } },
+      { id: 'vp-application', label: 'Layer: Application', category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('application'); onClose(); } },
+      { id: 'vp-technology',  label: 'Layer: Technology',  category: 'navigation', keywords: 'layer', action: () => { useStore.getState().toggleActiveViewpoint('technology');  onClose(); } },
     ];
 
     // Entity search items
@@ -63,7 +63,7 @@ export const CommandPalette: React.FC<{ onClose: () => void }> = ({ onClose }) =
       id: `entity-${e.id}`,
       label: e.name,
       category: 'entity' as const,
-      keywords: `${e.kind} ${e.shortName} ${e.description ?? ''} ${e.metadata.technology ?? ''} ${e.metadata.owner ?? ''}`,
+      keywords: `${e.kind} ${e.shortName} ${e.description ?? ''} ${e.metadata.technology ?? ''} ${e.metadata.organization ?? ''} ${e.metadata.owner ?? ''} ${e.metadata.sme ?? ''}`,
       icon: <ArrowRight size={14} />,
       action: () => {
         selectEntity(e.id);

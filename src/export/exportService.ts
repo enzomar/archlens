@@ -55,6 +55,13 @@ export function exportProject(project: ArchLensProject): void {
   saveAs(blob, `${project.name.replace(/\s+/g, '-').toLowerCase()}.archlens`);
 }
 
+export function exportProjectAs(project: ArchLensProject, fileName: string): void {
+  const json = JSON.stringify(project, null, 2);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const safeName = fileName.replace(/\s+/g, '-').toLowerCase();
+  saveAs(blob, safeName.endsWith('.archlens') ? safeName : `${safeName}.archlens`);
+}
+
 export function importProject(file: File): Promise<ArchLensProject> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
